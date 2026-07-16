@@ -107,3 +107,4 @@ and expects a response compatible with the dataset shape:
 5. The client calls `POST /api/analyse`
 6. The server runs query, analysis, insight, recommendation, and execution tools
 7. The UI renders KPI cards, risk list, recommendations, opportunity table, and campaign highlights
+"# finance-copilot-" 
