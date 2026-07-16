@@ -9,7 +9,10 @@
     {
       "src": "api/*.ts",
       "use": "@vercel/node",
-      "config": { "maxDuration": 60 }
+      "config": {
+        "maxDuration": 60,
+        "includeFiles": "server/src/**"
+      }
     }
   ],
   "routes": [
