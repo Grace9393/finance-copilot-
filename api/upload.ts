@@ -2,13 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { normaliseValue } from '../server/src/types.js';
 import type { FinanceDataset, FinanceRow } from '../server/src/types.js';
 
 export const config = { api: { bodyParser: false } };
-
-const require = createRequire(import.meta.url);
 
 function normaliseRows(rows: Record<string, unknown>[]): FinanceRow[] {
   return rows.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, normaliseValue(v)])));
@@ -111,8 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rows = normaliseRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' }));
       dataset = { source: originalname, fields: rows[0] ? Object.keys(rows[0]) : [], rows, fetchedAt: new Date().toISOString() };
     } else if (ext === '.pdf' || mimetype === 'application/pdf') {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
+      const { default: pdfParse } = await import('pdf-parse') as { default: (buf: Buffer) => Promise<{ text: string }> };
       const parsed = await pdfParse(buffer);
       if (!parsed.text?.trim()) throw new Error('PDF appears to be image-only (no extractable text).');
       dataset = textToDataset(parsed.text, originalname);
