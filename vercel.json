@@ -24,6 +24,6 @@
     { "src": "/api/upload",      "dest": "/api/upload.ts" },
     { "src": "/api/pptx",        "dest": "/api/pptx.ts" },
     { "src": "/api/chat",        "dest": "/api/chat.ts" },
-    { "src": "/(.*)",            "dest": "/client/dist/$1" }
+    { "src": "/(.*)",            "dest": "/client/$1" }
   ]
 }
