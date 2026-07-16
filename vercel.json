@@ -8,7 +8,8 @@
     },
     {
       "src": "api/*.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": { "maxDuration": 60 }
     }
   ],
   "routes": [
@@ -16,7 +17,8 @@
     { "src": "/api/health",      "dest": "/api/health.ts" },
     { "src": "/api/analyse",     "dest": "/api/analyse.ts" },
     { "src": "/api/upload",      "dest": "/api/upload.ts" },
+    { "src": "/api/pptx",        "dest": "/api/pptx.ts" },
     { "src": "/api/chat",        "dest": "/api/chat.ts" },
-    { "src": "/(.*)",            "dest": "/client/$1" }
+    { "src": "/(.*)",            "dest": "/client/dist/$1" }
   ]
 }

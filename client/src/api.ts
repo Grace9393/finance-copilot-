@@ -68,6 +68,8 @@ export interface ChatReply {
   elapsedMs: number;
   reportUrl?: string;
   reportFullText?: string;
+  /** Skill name when the reply was produced by a skill invocation via Context Studio */
+  skill?: string;
   /** Set when the reply contains a downloadable PPTX */
   pptxDownload?: { filename: string; base64: string; mimeType: string; slideCount: number; warnings: string[] };
 }

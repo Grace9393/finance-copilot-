@@ -2,10 +2,19 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import path from 'node:path';
-import { normaliseValue } from '../server/src/types.js';
-import type { FinanceDataset, FinanceRow } from '../server/src/types.js';
 
 export const config = { api: { bodyParser: false } };
+
+function normaliseValue(value: unknown): string | number {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return String(value ?? '');
+  const trimmed = value.trim();
+  const numeric = Number(trimmed.replace(/,/g, ''));
+  return trimmed !== '' && Number.isFinite(numeric) ? numeric : trimmed;
+}
+
+type FinanceRow = Record<string, string | number>;
+interface FinanceDataset { source: string; fields: string[]; rows: FinanceRow[]; fetchedAt: string; }
 
 function normaliseRows(rows: Record<string, unknown>[]): FinanceRow[] {
   return rows.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, normaliseValue(v)])));
@@ -51,18 +60,17 @@ async function readBody(req: VercelRequest): Promise<Buffer> {
   });
 }
 
-function parseMultipart(buffer: Buffer, boundary: string): { fieldname: string; filename: string; mimetype: string; data: Buffer } | null {
+function parseMultipart(buffer: Buffer, boundary: string): { filename: string; mimetype: string; data: Buffer } | null {
   const boundaryBuf = Buffer.from('--' + boundary);
-  const parts = [];
+  const parts: Buffer[] = [];
   let start = 0;
   while (start < buffer.length) {
     const idx = buffer.indexOf(boundaryBuf, start);
     if (idx === -1) break;
-    const partStart = idx + boundaryBuf.length + 2; // skip \r\n
+    const partStart = idx + boundaryBuf.length + 2;
     const nextIdx = buffer.indexOf(boundaryBuf, partStart);
     if (nextIdx === -1) break;
-    const partEnd = nextIdx - 2; // trim \r\n before next boundary
-    parts.push(buffer.slice(partStart, partEnd));
+    parts.push(buffer.slice(partStart, nextIdx - 2));
     start = nextIdx;
   }
   for (const part of parts) {
@@ -73,7 +81,7 @@ function parseMultipart(buffer: Buffer, boundary: string): { fieldname: string; 
     const cdMatch = headerStr.match(/Content-Disposition:[^\r\n]*name="([^"]*)"(?:[^\r\n]*filename="([^"]*)")?/i);
     const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
     if (cdMatch?.[1] === 'file') {
-      return { fieldname: cdMatch[1], filename: cdMatch[2] ?? 'upload', mimetype: ctMatch?.[1]?.trim() ?? 'application/octet-stream', data };
+      return { filename: cdMatch[2] ?? 'upload', mimetype: ctMatch?.[1]?.trim() ?? 'application/octet-stream', data };
     }
   }
   return null;
@@ -81,20 +89,16 @@ function parseMultipart(buffer: Buffer, boundary: string): { fieldname: string; 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-
   try {
     const contentType = req.headers['content-type'] ?? '';
     const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
     if (!boundaryMatch) { res.status(400).json({ error: 'Expected multipart/form-data' }); return; }
-
     const rawBody = await readBody(req);
     const file = parseMultipart(rawBody, boundaryMatch[1]);
     if (!file) { res.status(400).json({ error: 'No file found in upload' }); return; }
-
     const { filename: originalname, mimetype, data: buffer } = file;
     const ext = path.extname(originalname).toLowerCase();
     let dataset: FinanceDataset;
-
     if (ext === '.json') {
       const parsed = JSON.parse(buffer.toString('utf-8')) as Record<string, unknown>[];
       const rows = normaliseRows(Array.isArray(parsed) ? parsed : [parsed]);
@@ -117,12 +121,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (['.txt', '.md'].includes(ext) || mimetype.startsWith('text/')) {
       dataset = textToDataset(buffer.toString('utf-8'), originalname);
     } else if (mimetype.startsWith('image/')) {
-      const dataUri = `data:${mimetype};base64,${buffer.toString('base64')}`;
-      dataset = { source: originalname, fields: ['filename', 'mimeType', 'sizeBytes'], rows: [{ filename: originalname, mimeType: mimetype, sizeBytes: buffer.length }], fetchedAt: new Date().toISOString(), imageDataUri: dataUri } as unknown as FinanceDataset;
+      dataset = { source: originalname, fields: ['filename', 'mimeType', 'sizeBytes'], rows: [{ filename: originalname, mimeType: mimetype, sizeBytes: buffer.length }], fetchedAt: new Date().toISOString() };
     } else {
       res.status(415).json({ error: `Unsupported file type: ${ext || mimetype}` }); return;
     }
-
     res.json(dataset);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Upload failed' });

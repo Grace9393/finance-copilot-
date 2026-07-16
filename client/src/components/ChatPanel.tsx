@@ -33,7 +33,7 @@ const MODE_LABELS: Record<ChatMode, string> = {
 };
 
 const MODE_TIPS: Record<ChatMode, string> = {
-  hybrid: 'Web search (no data loaded) or Context Studio (data loaded). Use @context prefix to force Context Studio.',
+  hybrid: 'Context Studio when data is loaded, a skill is invoked, or @context prefix is used. Falls back to web search otherwise.',
   vector: 'Semantic similarity search — always queries Context Studio knowledge base',
   graph: 'Knowledge graph traversal — always queries Context Studio knowledge base',
   schema: 'Fetch Context Studio schema',
@@ -382,7 +382,7 @@ export function ChatPanel({ dataContext, onDataContextChange }: ChatPanelProps) 
     {
       id: nextId(),
       role: 'assistant',
-      text: 'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.'
+      text: 'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**Skills & Context Studio (always available):**\n• Click **⚡ Skills** to pick a skill — e.g. "Use the financial-variance-analysis skill to…"\n• Use **Vector** or **Graph** mode to search the knowledge base directly\n• Prefix any message with **@context** — e.g. "@context summarize IBM financials"\n• Drop a file (PDF, Excel, CSV…) — all follow-up questions are grounded on it\n\n**Web search (hybrid mode, no data loaded):**\n• Type naturally — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF'
     }
   ]);
   const [input, setInput] = useState('');
@@ -508,7 +508,8 @@ export function ChatPanel({ dataContext, onDataContextChange }: ChatPanelProps) 
       const res: ChatReply = await sendChatMessage(text, mode, effectiveContext);
       const toolLabel =
         res.tool === 'report-search' ? '📄 report'
-        : res.tool === 'web-search' ? '🔍 web search'
+        : res.tool === 'web-search'  ? '🔍 web search'
+        : res.skill                  ? `⚡ ${res.skill}`
         : res.mode;
       const metaParts = [toolLabel, `${res.elapsedMs}ms`];
 
