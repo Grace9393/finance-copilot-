@@ -21,7 +21,9 @@ const WELCOME = [
   '• **Projection** — "Based on existing data points, what is the projection on revenue and margin by business and geo?"',
   '• **Liquidity** — "What\'s the status of cash balances, AR and inventory?"',
   '',
-  'Answers include tables and a **confidence level**. Prefix with **@context** to query Context Studio directly, or type "IBM 2025 annual report" to fetch the source document.'
+  'Answers include tables and a **confidence level**.',
+  '',
+  '**Skills:** open ⚡ Skills and click one, or type **@skill-name** — e.g. "@financial-variance-analysis IBM FY2025 vs FY2024". Prefix with **@context** to query the Context Studio knowledge base directly.'
 ].join('\n');
 
 const SUGGESTIONS: ChatSuggestion[] = [

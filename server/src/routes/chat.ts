@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { callTool, extractText, getConfig, listTools } from '../contextStudio.js';
 import { answerEnquiry, detectEnquiry } from '../enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../reportSearch.js';
+import { detectSkillInvocation } from '../skills.js';
 import { webSearch } from '../webSearch.js';
 
 export const chatRouter = Router();
@@ -97,14 +98,22 @@ chatRouter.post('/', async (request, response) => {
   const trimmedMessage = message?.trim() ?? '';
   const startedAt = Date.now();
 
+  // ── Routing flags (parity with api/chat.ts skill-aware routing v2) ──────────
+  // Skills ("@skill-name …", "Use the X skill …"), the @context prefix, loaded
+  // data, and explicit vector/graph modes all force Context Studio MCP.
+  const hasDataContext = (dataContext?.rows?.length ?? 0) > 0;
+  const isExplicitCSMode = chatMode === 'vector' || chatMode === 'graph';
+  const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
+  const skillInvocation = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
+  const forceContextStudio = isExplicitCSMode || isContextPrefixed || hasDataContext || skillInvocation !== null;
+
   // ── Finance enquiry engine (Section 2 archetypes) ────────────────────────────
   // Root-cause / ranking, projections with confidence, and cash/AR/inventory
   // status questions are answered from the ingested IBM annual-report dataset
   // (internal finance / EPM stand-in), with internet augmentation for
   // competitor context. Prefix a message with @context to bypass this and go
   // straight to Context Studio.
-  const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
-  const enquiryKind = needsMessage && !isContextPrefixed ? detectEnquiry(trimmedMessage) : null;
+  const enquiryKind = needsMessage && !forceContextStudio ? detectEnquiry(trimmedMessage) : null;
   if (enquiryKind) {
     try {
       const answer = await answerEnquiry(trimmedMessage, enquiryKind);
@@ -128,8 +137,9 @@ chatRouter.post('/', async (request, response) => {
 
   // ── Annual report intent detection ──────────────────────────────────────────
   // If the message looks like "<Company> <Year> report", fetch the document
-  // directly instead of querying Context Studio.
-  const reportIntent = needsMessage ? detectReportIntent(trimmedMessage) : null;
+  // directly instead of querying Context Studio. Guarded so skill prompts that
+  // mention a company + year are not hijacked.
+  const reportIntent = needsMessage && !forceContextStudio ? detectReportIntent(trimmedMessage) : null;
   if (reportIntent) {
     try {
       const result = await searchAnnualReport(reportIntent.company, reportIntent.year);
@@ -182,15 +192,9 @@ chatRouter.post('/', async (request, response) => {
   }
 
   // ── General web search path ──────────────────────────────────────────────────
-  // Route to web search only when ALL of the following are true:
-  //   • it's a query mode (hybrid/vector/graph)
-  //   • no data context is loaded
-  //   • mode is hybrid (vector/graph are explicit Context Studio intents)
-  //   • message does NOT start with @context (explicit CS override)
-  const hasDataContext = (dataContext?.rows?.length ?? 0) > 0;
-  const isExplicitContextMode = chatMode === 'vector' || chatMode === 'graph';
-  const isContextPrefix = trimmedMessage.toLowerCase().startsWith('@context');
-  const isWebSearch = needsMessage && !hasDataContext && !isExplicitContextMode && !isContextPrefix;
+  // Last-resort fallback: only in hybrid mode with no data context, no skill
+  // invocation, and no @context prefix.
+  const isWebSearch = needsMessage && !forceContextStudio;
   if (isWebSearch) {
     try {
       const result = await webSearch(trimmedMessage);
@@ -244,11 +248,22 @@ chatRouter.post('/', async (request, response) => {
     return;
   }
 
-  // ── Normal Context Studio path ───────────────────────────────────────────────
-  // Strip @context prefix if present before sending to Context Studio
-  const csMessage = isContextPrefix
+  // ── Context Studio path (skills, @context, data loaded, explicit mode) ───────
+  const csConfig = getConfig();
+  if (!csConfig.url) {
+    response.status(503).json({
+      error: 'Context Studio is not configured. Provide server/context-studio.json or set the CONTEXT_STUDIO_URL environment variable.',
+      tool: 'context-broker',
+      mode: chatMode,
+      elapsedMs: Date.now() - startedAt
+    });
+    return;
+  }
+  // Strip the @context prefix, or rewrite an "@skill-name …" invocation into
+  // its canonical "Use the <skill> skill: …" form before sending.
+  const csMessage = isContextPrefixed
     ? trimmedMessage.replace(/^@context\s*/i, '').trim()
-    : trimmedMessage;
+    : (skillInvocation?.message ?? trimmedMessage);
   const groundedMessage = buildGroundedMessage(csMessage, dataContext);
   const { tool, args } = buildToolCall(chatMode, groundedMessage);
 
@@ -259,7 +274,8 @@ chatRouter.post('/', async (request, response) => {
       tool,
       mode: chatMode,
       isError: result.isError ?? false,
-      elapsedMs: Date.now() - startedAt
+      elapsedMs: Date.now() - startedAt,
+      skill: skillInvocation?.skill
     });
   } catch (error) {
     response.status(502).json({

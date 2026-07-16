@@ -3,41 +3,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../server/src/reportSearch.js';
+import { detectSkillInvocation } from '../server/src/skills.js';
 import { webSearch } from '../server/src/webSearch.js';
 import type { ChatMode, DataContext } from '../server/src/routes/chat.js';
-
-// ── Skill-intent detection ────────────────────────────────────────────────────
-
-/** Named skills surfaced in the client Skills drawer. */
-const SKILL_NAMES = [
-  'annual-report-analyzer',
-  'earnings-peer-comparison',
-  'financial-variance-analysis',
-  'margin-lever-playbook',
-  'file-to-pptx',
-  'pdf-file-reader',
-  'web-document-search',
-  'annual-report-search',
-  'web-search',
-  'industry-search',
-] as const;
-
-/**
- * Returns the matched skill name when the message is a skill invocation,
- * e.g. "Use the financial-variance-analysis skill to …"
- * These must always reach Context Studio rather than the web-search fallback.
- */
-function detectSkill(message: string): string | null {
-  // "Use the X skill …" — generic pattern
-  const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b/i);
-  if (genericMatch) return genericMatch[1].toLowerCase();
-  // Explicit skill name anywhere in the message (simple includes — names are unique enough)
-  const lower = message.toLowerCase();
-  for (const name of SKILL_NAMES) {
-    if (lower.includes(name)) return name;
-  }
-  return null;
-}
 
 // ── Chat helpers ──────────────────────────────────────────────────────────────
 
@@ -103,7 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hasDataContext     = (dataContext?.rows?.length ?? 0) > 0;
   const isExplicitCSMode   = chatMode === 'vector' || chatMode === 'graph';
   const isContextPrefix    = trimmedMessage.toLowerCase().startsWith('@context');
-  const detectedSkill      = needsMessage ? detectSkill(trimmedMessage) : null;
+  const skillInvocation    = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
+  const detectedSkill      = skillInvocation?.skill ?? null;
   const isSkill            = detectedSkill !== null;
   // Force Context Studio when: explicit mode, @context prefix, data is loaded, or a skill is invoked.
   const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
@@ -155,7 +124,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(503).json({ error: 'Context Studio is not configured. Set the CONTEXT_STUDIO_URL environment variable.', tool: 'context-broker', mode: chatMode, elapsedMs: Date.now() - startedAt });
       return;
     }
-    const csMessage = isContextPrefix ? trimmedMessage.replace(/^@context\s*/i, '').trim() : trimmedMessage;
+    const csMessage = isContextPrefix
+      ? trimmedMessage.replace(/^@context\s*/i, '').trim()
+      : (skillInvocation?.message ?? trimmedMessage);
     const groundedMessage = buildGroundedMessage(csMessage, dataContext);
     const { tool, args } = buildToolCall(chatMode, groundedMessage);
     try {

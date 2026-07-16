@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
 export interface ContextStudioConfig {
   url: string;
   bearerToken: string;
@@ -29,15 +32,19 @@ let cachedConfig: ContextStudioConfig | null = null;
 // Also reset session state so each serverless invocation gets a fresh MCP session
 
 function loadFileConfig(): Partial<ContextStudioConfig> {
-  // Try to load from file (local dev only) — silently skip if missing
-  try {
-    // Dynamic require to avoid import.meta issues in commonjs/serverless environments
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require('../context-studio.json') as ContextStudioConfig;
-    return data;
-  } catch {
-    return {};
+  // Try to load from file (local dev / Railway) — silently skip if missing.
+  // fs + cwd-relative paths work in both ESM (tsx / node dist) and serverless
+  // CJS bundles; on Vercel the file is absent and env vars are used instead.
+  const candidates = [
+    resolve(process.cwd(), 'context-studio.json'),          // cwd = server/
+    resolve(process.cwd(), 'server', 'context-studio.json') // cwd = repo root
+  ];
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(readFileSync(candidate, 'utf-8')) as ContextStudioConfig;
+    } catch { /* try next candidate */ }
   }
+  return {};
 }
 
 export function getConfig(): ContextStudioConfig {

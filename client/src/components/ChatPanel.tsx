@@ -43,66 +43,72 @@ const MODE_TIPS: Record<ChatMode, string> = {
 
 const QUERY_MODES: ChatMode[] = ['hybrid', 'vector', 'graph'];
 
+/**
+ * Installed skills (mirrors C:\Users\GRACEPAN\.bob\skills + built-in quick
+ * actions). Clicking "Use ↗" inserts the @skill-name invocation; typing
+ * "@skill-name …" by hand works the same way. All skill invocations route to
+ * Context Studio MCP; "@context …" queries Context Studio directly.
+ */
 const SKILLS: Skill[] = [
-  {
-    name: 'annual-report-search',
-    label: '📄 Annual Report',
-    description: 'Type a company name + year (e.g. "IBM 2025 report") to auto-find and fetch the annual report PDF.',
-    prompt: 'IBM 2025 annual report'
-  },
-  {
-    name: 'web-search',
-    label: '🔍 Web Search',
-    description: 'Search the web for market overviews, industry trends, news, or any open topic.',
-    prompt: 'search for overall market trend in AI industry 2025'
-  },
-  {
-    name: 'industry-search',
-    label: '📊 Industry Trend',
-    description: 'Get market size, growth outlook, and competitive landscape for a specific industry.',
-    prompt: 'industry overview and market outlook for '
-  },
-  {
-    name: 'file-to-pptx',
-    label: 'File to PowerPoint',
-    description: 'Convert uploaded files (PDF, Excel, CSV, MD, images…) into an editable, IBM Carbon-branded PowerPoint deck.',
-    prompt: 'Use the file-to-pptx skill to convert the uploaded file into a PowerPoint presentation: '
-  },
-  {
-    name: 'pdf-file-reader',
-    label: 'PDF File Reader',
-    description: 'Read, extract text, tables and form fields from local or uploaded PDFs (incl. scanned / OCR).',
-    prompt: 'Use the pdf-file-reader skill to extract and summarize the content of the uploaded PDF: '
-  },
-  {
-    name: 'web-document-search',
-    label: 'Web Document Search',
-    description: 'Search the public web for documents and pages, then open and read them with attribution.',
-    prompt: 'Use the web-document-search skill to find and read: '
-  },
   {
     name: 'annual-report-analyzer',
     label: 'Annual Report Analyzer',
     description: 'Locate & summarize a company\'s annual report / 10-K into a cited financial digest.',
-    prompt: 'Use the annual-report-analyzer skill to summarize the latest annual report for '
+    prompt: '@annual-report-analyzer summarize the latest annual report for '
   },
   {
     name: 'earnings-peer-comparison',
     label: 'Earnings Peer Comparison',
     description: 'Side-by-side comparison of two or more companies\' reported financial results.',
-    prompt: 'Use the earnings-peer-comparison skill to compare '
+    prompt: '@earnings-peer-comparison compare '
   },
   {
     name: 'financial-variance-analysis',
     label: 'Financial Variance Analysis',
     description: 'Decompose financial variances into waterfall bridges with leadership-ready narratives.',
-    prompt: 'Use the financial-variance-analysis skill to analyze the variance between '
+    prompt: '@financial-variance-analysis analyze the variance between '
   },
   {
     name: 'margin-lever-playbook',
     label: 'Margin Lever Playbook',
     description: 'Map quantified margin/cost risks to prioritized corrective actions with expected-impact ranges.',
-    prompt: 'Use the margin-lever-playbook skill to recommend actions for the following risk: '
+    prompt: '@margin-lever-playbook recommend actions for the following risk: '
+  },
+  {
+    name: 'file-to-pptx',
+    label: 'File to PowerPoint',
+    description: 'Convert uploaded files (PDF, Excel, CSV, MD, images…) into an editable, IBM Carbon-branded PowerPoint deck.',
+    prompt: '@file-to-pptx convert the uploaded file into a PowerPoint presentation: '
+  },
+  {
+    name: 'pdf-file-reader',
+    label: 'PDF File Reader',
+    description: 'Read, extract text, tables and form fields from local or uploaded PDFs (incl. scanned / OCR).',
+    prompt: '@pdf-file-reader extract and summarize the content of the uploaded PDF: '
+  },
+  {
+    name: 'web-document-search',
+    label: 'Web Document Search',
+    description: 'Search the public web for documents and pages, then open and read them with attribution.',
+    prompt: '@web-document-search find and read: '
+  },
+  {
+    name: 'annual-report-search',
+    label: '📄 Annual Report (quick)',
+    description: 'Type a company name + year (e.g. "IBM 2025 report") to auto-find and fetch the annual report PDF.',
+    prompt: 'IBM 2025 annual report'
+  },
+  {
+    name: 'web-search',
+    label: '🔍 Web Search (quick)',
+    description: 'Search the web for market overviews, industry trends, news, or any open topic.',
+    prompt: 'search for overall market trend in AI industry 2025'
+  },
+  {
+    name: 'industry-search',
+    label: '📊 Industry Trend (quick)',
+    description: 'Get market size, growth outlook, and competitive landscape for a specific industry.',
+    prompt: 'industry overview and market outlook for '
   }
 ];
 
@@ -324,11 +330,11 @@ function SkillsDrawer({ open, onUse }: { open: boolean; onUse: (prompt: string) 
   if (!open) return null;
   return (
     <div className="skills-drawer">
-      <div className="skills-drawer-title">Available Skills ({SKILLS.length})</div>
+      <div className="skills-drawer-title">Available Skills ({SKILLS.length}) — click Use, or type @skill-name in the chat</div>
       {SKILLS.map((skill) => (
         <div key={skill.name} className="skill-card">
           <div className="skill-card-top">
-            <code className="skill-name">{skill.name}</code>
+            <code className="skill-name">@{skill.name}</code>
             <button className="skill-use-btn" type="button" onClick={() => onUse(skill.prompt)}>Use ↗</button>
           </div>
           <div className="skill-desc muted">{skill.description}</div>
