@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
+import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../server/src/reportSearch.js';
 import { webSearch } from '../server/src/webSearch.js';
 import type { ChatMode, DataContext } from '../server/src/routes/chat.js';
@@ -60,6 +61,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const trimmedMessage = message?.trim() ?? '';
   const startedAt = Date.now();
+
+  // Finance enquiry engine (Section 2 archetypes: root cause, projection, liquidity)
+  const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
+  const enquiryKind = needsMessage && !isContextPrefixed ? detectEnquiry(trimmedMessage) : null;
+  if (enquiryKind) {
+    try {
+      const answer = await answerEnquiry(trimmedMessage, enquiryKind);
+      res.json({ reply: answer.reply, tool: answer.tool, mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : 'Finance enquiry failed', tool: 'finance-enquiry', mode: chatMode, elapsedMs: Date.now() - startedAt });
+    }
+    return;
+  }
 
   // Report intent
   const reportIntent = needsMessage ? detectReportIntent(trimmedMessage) : null;

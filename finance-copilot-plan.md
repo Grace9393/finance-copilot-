@@ -233,6 +233,53 @@ interface DecisionPackage {
 5. Sub-Task 5 (Dashboard UI) — depends on API contract defined in Sub-Task 4
 6. Sub-Task 6 (Sample Data + README) — depends on all of the above
 
+## Phase 2 — Two-Section CFO Co-Pilot (July 2026)
+
+Requirements update: restructure the POC into **two sections**, ingesting the
+**last 3 years of IBM annual reports** as the internal finance / EPM data source.
+UI reference: the *WatsonX Sample Output Dashboard* deck and
+https://abc-cfo-dashboard.azurewebsites.net/.
+
+### Sub-Task 7 — Ingest IBM annual reports (FY2023–FY2025)
+
+- `server/data/ibm-annual-reports.json` — revenue by segment & geography, gross
+  profit/margin, net income, FCF, cash & securities, AR, inventory, debt; each
+  record tagged `reported` / `derived` / `illustrative`
+- `server/src/ibmData.ts` — loader, filter/allocation helpers, dashboard builder
+
+**Status**: [x] done
+
+### Sub-Task 8 — Section 1: configurable dashboard
+
+- `GET /api/dashboard` + `GET /api/dashboard/options`
+- Configurable **Year / Geography / Country / Business Segment** filter bar
+- KPI strip (Revenue, Gross Profit, GM%, Net Income, FCF, Cash & Securities),
+  key insight, revenue-by-segment/geo bar charts, 3-year trend, P&L summary
+  table, cash & working capital panel, risk & opportunity panel, recommended
+  actions — mirroring the deck's seven dashboard sections
+- Input data: **internal finance systems / EPM only** (the ingested dataset)
+- Client: `DashboardSection.tsx`, `charts.tsx` (SVG, CVD-validated palette)
+
+**Status**: [x] done
+
+### Sub-Task 9 — Section 2: free-text enquiry
+
+- `server/src/enquiry.ts` — three enquiry archetypes answered from internal
+  data with **tables + confidence levels**:
+  1. root cause / market ranking (+ internet competitor context on request)
+  2. revenue / margin projection by business & geo (trend extrapolation)
+  3. cash / AR / inventory status (FCF, sold-not-delivered, excess inventory,
+     receivables by geo)
+- Wired into `POST /api/chat` ahead of report-fetch / web-search /
+  Context Studio MCP routing (`@context` prefix still forces MCP)
+- Client: `EnquirySection.tsx` — source-scope pills (Internal EPM · ISC ·
+  Internet · Context Studio MCP), suggested-question chips, multi-table
+  message rendering
+
+**Status**: [x] done
+
+---
+
 ## Key Decisions Captured
 
 | Decision | Choice | Rationale |

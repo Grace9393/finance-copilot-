@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { callTool, extractText, getConfig, listTools } from '../contextStudio.js';
+import { answerEnquiry, detectEnquiry } from '../enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../reportSearch.js';
 import { webSearch } from '../webSearch.js';
 
@@ -95,6 +96,35 @@ chatRouter.post('/', async (request, response) => {
 
   const trimmedMessage = message?.trim() ?? '';
   const startedAt = Date.now();
+
+  // ── Finance enquiry engine (Section 2 archetypes) ────────────────────────────
+  // Root-cause / ranking, projections with confidence, and cash/AR/inventory
+  // status questions are answered from the ingested IBM annual-report dataset
+  // (internal finance / EPM stand-in), with internet augmentation for
+  // competitor context. Prefix a message with @context to bypass this and go
+  // straight to Context Studio.
+  const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
+  const enquiryKind = needsMessage && !isContextPrefixed ? detectEnquiry(trimmedMessage) : null;
+  if (enquiryKind) {
+    try {
+      const answer = await answerEnquiry(trimmedMessage, enquiryKind);
+      response.json({
+        reply: answer.reply,
+        tool: answer.tool,
+        mode: chatMode,
+        isError: false,
+        elapsedMs: Date.now() - startedAt
+      });
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : 'Finance enquiry failed',
+        tool: 'finance-enquiry',
+        mode: chatMode,
+        elapsedMs: Date.now() - startedAt
+      });
+    }
+    return;
+  }
 
   // ── Annual report intent detection ──────────────────────────────────────────
   // If the message looks like "<Company> <Year> report", fetch the document
