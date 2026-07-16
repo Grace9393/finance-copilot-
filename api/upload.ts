@@ -1,55 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { parse } from 'csv-parse/sync';
-import * as XLSX from 'xlsx';
-import path from 'node:path';
+import { parseFileBuffer } from '../server/src/ingest.js';
 
 export const config = { api: { bodyParser: false } };
-
-function normaliseValue(value: unknown): string | number {
-  if (typeof value === 'number') return value;
-  if (typeof value !== 'string') return String(value ?? '');
-  const trimmed = value.trim();
-  const numeric = Number(trimmed.replace(/,/g, ''));
-  return trimmed !== '' && Number.isFinite(numeric) ? numeric : trimmed;
-}
-
-type FinanceRow = Record<string, string | number>;
-interface FinanceDataset { source: string; fields: string[]; rows: FinanceRow[]; fetchedAt: string; }
-
-function normaliseRows(rows: Record<string, unknown>[]): FinanceRow[] {
-  return rows.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, normaliseValue(v)])));
-}
-
-function parseTextTable(text: string): FinanceRow[] | null {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const tableLines = lines.filter(l => l.includes('|') && l.split('|').length >= 3);
-  if (tableLines.length < 2) return null;
-  const dataLines = tableLines.filter(l => !/^[\s|:-]+$/.test(l));
-  if (dataLines.length < 2) return null;
-  const parseCells = (line: string) => line.split('|').map(c => c.trim()).filter((c, i, a) => !(i === 0 && c === '') && !(i === a.length - 1 && c === ''));
-  const headers = parseCells(dataLines[0]);
-  if (headers.length < 2) return null;
-  const rows: FinanceRow[] = [];
-  for (const line of dataLines.slice(1)) {
-    const cells = parseCells(line);
-    if (!cells.length) continue;
-    const entry: FinanceRow = {};
-    headers.forEach((h, i) => { entry[h || `col_${i + 1}`] = normaliseValue(cells[i] ?? ''); });
-    rows.push(entry);
-  }
-  return rows.length > 0 ? rows : null;
-}
-
-function chunkTextToRows(text: string): FinanceRow[] {
-  let chunks = text.split(/\n{2,}/).map(c => c.replace(/\n/g, ' ').trim()).filter(c => c.length > 20);
-  if (chunks.length < 3) chunks = text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(s => s.length > 20) ?? [text.trim()];
-  return chunks.slice(0, 300).map((chunk, i) => ({ index: i + 1, text: chunk }));
-}
-
-function textToDataset(text: string, source: string): FinanceDataset {
-  const rows = parseTextTable(text) ?? chunkTextToRows(text);
-  return { source, fields: rows[0] ? Object.keys(rows[0]) : ['text'], rows, fetchedAt: new Date().toISOString() };
-}
 
 async function readBody(req: VercelRequest): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -87,6 +39,11 @@ function parseMultipart(buffer: Buffer, boundary: string): { filename: string; m
   return null;
 }
 
+/**
+ * Serverless wrapper for POST /api/upload — parsing is shared with the
+ * Express route and /api/source via server/src/ingest.ts (xlsx / xls / xlsm /
+ * csv / json / pdf / docx / pptx / txt / md / html / images).
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   try {
@@ -96,37 +53,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawBody = await readBody(req);
     const file = parseMultipart(rawBody, boundaryMatch[1]);
     if (!file) { res.status(400).json({ error: 'No file found in upload' }); return; }
-    const { filename: originalname, mimetype, data: buffer } = file;
-    const ext = path.extname(originalname).toLowerCase();
-    let dataset: FinanceDataset;
-    if (ext === '.json') {
-      const parsed = JSON.parse(buffer.toString('utf-8')) as Record<string, unknown>[];
-      const rows = normaliseRows(Array.isArray(parsed) ? parsed : [parsed]);
-      dataset = { source: originalname, fields: rows[0] ? Object.keys(rows[0]) : [], rows, fetchedAt: new Date().toISOString() };
-    } else if (ext === '.csv') {
-      const rows = normaliseRows(parse(buffer.toString('utf-8'), { columns: true, skip_empty_lines: true }) as Record<string, unknown>[]);
-      dataset = { source: originalname, fields: rows[0] ? Object.keys(rows[0]) : [], rows, fetchedAt: new Date().toISOString() };
-    } else if (['.xlsx', '.xls', '.xlsm'].includes(ext)) {
-      const wb = XLSX.read(buffer, { type: 'buffer' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = normaliseRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' }));
-      dataset = { source: originalname, fields: rows[0] ? Object.keys(rows[0]) : [], rows, fetchedAt: new Date().toISOString() };
-    } else if (ext === '.pdf' || mimetype === 'application/pdf') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfModule = await import('pdf-parse') as any;
-      const pdfParse = (pdfModule.default ?? pdfModule) as (buf: Buffer) => Promise<{ text: string }>;
-      const parsed = await pdfParse(buffer);
-      if (!parsed.text?.trim()) throw new Error('PDF appears to be image-only (no extractable text).');
-      dataset = textToDataset(parsed.text, originalname);
-    } else if (['.txt', '.md'].includes(ext) || mimetype.startsWith('text/')) {
-      dataset = textToDataset(buffer.toString('utf-8'), originalname);
-    } else if (mimetype.startsWith('image/')) {
-      dataset = { source: originalname, fields: ['filename', 'mimeType', 'sizeBytes'], rows: [{ filename: originalname, mimeType: mimetype, sizeBytes: buffer.length }], fetchedAt: new Date().toISOString() };
-    } else {
-      res.status(415).json({ error: `Unsupported file type: ${ext || mimetype}` }); return;
-    }
-    res.json(dataset);
+    res.json(await parseFileBuffer(file.data, file.filename, file.mimetype));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Upload failed' });
+    const message = err instanceof Error ? err.message : 'Upload failed';
+    res.status(message.startsWith('Unsupported') ? 415 : 422).json({ error: message });
   }
 }

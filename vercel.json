@@ -22,6 +22,7 @@
     { "src": "/api/health",      "dest": "/api/health.ts" },
     { "src": "/api/analyse",     "dest": "/api/analyse.ts" },
     { "src": "/api/upload",      "dest": "/api/upload.ts" },
+    { "src": "/api/source",      "dest": "/api/source.ts" },
     { "src": "/api/pptx",        "dest": "/api/pptx.ts" },
     { "src": "/api/chat",        "dest": "/api/chat.ts" },
     { "src": "/(.*)",            "dest": "/client/$1" }

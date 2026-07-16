@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChatMode, ChatReply, DataContext, FinanceDataset, PptxReply, convertToPptx, getChatStatus, sendChatMessage, uploadFile } from '../api';
+import { DataSourceBar, UPLOAD_ACCEPT } from './DataSourceBar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ interface Skill {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const ACCEPTED_TYPES = '.pdf,.xlsx,.xls,.xlsm,.csv,.json,.txt,.md,.png,.jpg,.jpeg,.gif,.webp';
+const ACCEPTED_TYPES = UPLOAD_ACCEPT;
 
 const MODE_LABELS: Record<ChatMode, string> = {
   hybrid: 'Hybrid',
@@ -420,12 +421,14 @@ interface ChatPanelProps {
   welcomeText?: string;
   /** Suggested enquiry chips rendered above the input row */
   suggestions?: ChatSuggestion[];
+  /** Show the data-source connect buttons (upload / local path / web URL / Google Sheet) */
+  showSourceBar?: boolean;
 }
 
 const DEFAULT_WELCOME =
   'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.';
 
-export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions }: ChatPanelProps) {
+export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions, showSourceBar }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: nextId(),
@@ -665,8 +668,27 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
         <div ref={bottomRef} />
       </div>
 
-      {/* File upload zone */}
+      {/* Data-source connect buttons + file upload zone */}
       <div className="chat-upload-area">
+        {showSourceBar && (
+          <DataSourceBar
+            compact
+            connectedSource={uploadedDataset?.source ?? null}
+            onConnect={(dataset) => {
+              setUploadedDataset(dataset);
+              setPendingFile(null);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: nextId(),
+                  role: 'assistant',
+                  text: `Data source connected: **${dataset.source}** — ${dataset.rows.length} rows, ${dataset.fields.length} fields (${dataset.fields.slice(0, 6).join(', ')}${dataset.fields.length > 6 ? '…' : ''}).\n\nAll questions are now grounded on this data.`
+                }
+              ]);
+            }}
+            onClear={handleClearFile}
+          />
+        )}
         <FileZone
           pendingFile={pendingFile}
           uploading={uploading}

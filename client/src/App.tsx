@@ -1,6 +1,9 @@
+import { useMemo, useState } from 'react';
 import './App.css';
+import { DataContext, FinanceDataset } from './api';
 import { ChatPanel, ChatSuggestion } from './components/ChatPanel';
 import { DashboardSection } from './components/DashboardSection';
+import { DataSourceBar, DatasetPreview } from './components/DataSourceBar';
 
 /**
  * CFO AI Co-Pilot — single-page POC:
@@ -42,6 +45,20 @@ const SUGGESTIONS: ChatSuggestion[] = [
 ];
 
 export default function App() {
+  // External data source (upload / local path / web URL / Google Sheet) —
+  // shared by the dashboard (preview) and the chat (grounding context).
+  const [externalData, setExternalData] = useState<FinanceDataset | null>(null);
+
+  const externalContext: DataContext | undefined = useMemo(() => {
+    if (!externalData?.rows?.length) return undefined;
+    return {
+      source: externalData.source,
+      fields: externalData.fields,
+      rows: externalData.rows,
+      narrative: `External data source connected: ${externalData.source}`
+    };
+  }, [externalData]);
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -58,13 +75,24 @@ export default function App() {
       </header>
 
       <div className="workspace">
-        {/* Left: Section 1 — configurable dashboard (internal EPM only) */}
+        {/* Left: Section 1 — configurable dashboard (internal EPM by default;
+            external sources can be connected and previewed) */}
         <div className="dashboard">
+          <div className="card">
+            <h2 className="section-title">Data sources</h2>
+            <DataSourceBar
+              connectedSource={externalData?.source ?? null}
+              onConnect={setExternalData}
+              onClear={() => setExternalData(null)}
+            />
+          </div>
+          {externalData && <DatasetPreview dataset={externalData} onClear={() => setExternalData(null)} />}
           <DashboardSection />
         </div>
 
-        {/* Right: Section 2 — free-text enquiry chat */}
-        <ChatPanel welcomeText={WELCOME} suggestions={SUGGESTIONS} />
+        {/* Right: Section 2 — free-text enquiry chat (grounded on any
+            connected external source) */}
+        <ChatPanel welcomeText={WELCOME} suggestions={SUGGESTIONS} dataContext={externalContext} showSourceBar />
       </div>
     </div>
   );

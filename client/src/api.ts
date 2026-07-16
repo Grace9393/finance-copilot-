@@ -40,6 +40,25 @@ export interface FinanceDataset {
   fields: string[];
   rows: FinanceRow[];
   fetchedAt: string;
+  /** Present for image uploads — used for preview only */
+  imageDataUri?: string;
+}
+
+export type ExternalSourceType = 'localPath' | 'webUrl' | 'googleSheet';
+
+/** Connect an external data source (local path / web URL / Google Sheet). */
+export async function connectSource(type: ExternalSourceType, value: string): Promise<FinanceDataset> {
+  const response = await fetch(`${API_BASE}/api/source`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, value })
+  });
+  if (!response.ok) {
+    let msg = `Source connection failed (${response.status})`;
+    try { const b = (await response.json()) as { error?: string }; if (b.error) msg = b.error; } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  return (await response.json()) as FinanceDataset;
 }
 
 export interface DecisionPackage {

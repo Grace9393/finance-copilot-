@@ -266,6 +266,101 @@ select {
   padding: 0 4px 8px;
 }
 
+/* ── Data source bar & preview ─────────────────────────── */
+
+.source-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.source-bar-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.source-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.source-btn:hover:not(:disabled) {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.source-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.source-btn.clear {
+  border-color: #fca5a5;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.source-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.source-bar.compact .source-btn {
+  padding: 5px 9px;
+  font-size: 11px;
+}
+
+.source-picker-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.source-picker-input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.source-picker-input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 0;
+}
+
+.source-bar-status {
+  font-size: 12px;
+}
+
+.source-preview .source-preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.source-preview-name {
+  color: #1d4ed8;
+  word-break: break-all;
+}
+
+.chat-upload-area .source-bar {
+  margin-bottom: 8px;
+}
+
 /* ── Section 2: free-text enquiry ──────────────────────── */
 
 .enquiry-section {
