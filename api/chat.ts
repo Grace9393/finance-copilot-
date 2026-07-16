@@ -31,9 +31,10 @@ function detectSkill(message: string): string | null {
   // "Use the X skill …" — generic pattern
   const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b/i);
   if (genericMatch) return genericMatch[1].toLowerCase();
-  // Explicit skill name anywhere in the message
+  // Explicit skill name anywhere in the message (simple includes — names are unique enough)
+  const lower = message.toLowerCase();
   for (const name of SKILL_NAMES) {
-    if (new RegExp(`\\b${name}\\b`, 'i').test(message)) return name;
+    if (lower.includes(name)) return name;
   }
   return null;
 }
