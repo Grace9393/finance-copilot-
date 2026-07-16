@@ -7,5 +7,9 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001'
     }
+  },
+  define: {
+    // Expose the backend URL to the client bundle (set VITE_API_URL in Vercel env vars)
+    __API_URL__: JSON.stringify(process.env.VITE_API_URL ?? '')
   }
 });

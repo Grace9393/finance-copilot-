@@ -1,3 +1,6 @@
+declare const __API_URL__: string;
+const API_BASE = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '';
+
 export type SourceType = 'localFile' | 'webScraper' | 'googleSheets' | 'icaMcp' | 'pdf';
 export type ChatMode = 'hybrid' | 'vector' | 'graph' | 'schema' | 'metadata' | 'contexts';
 
@@ -83,7 +86,7 @@ export async function convertToPptx(file: File, title?: string): Promise<PptxRep
   form.append('file', file);
   if (title) form.append('title', title);
 
-  const response = await fetch('/api/pptx', { method: 'POST', body: form });
+  const response = await fetch(`${API_BASE}/api/pptx`, { method: 'POST', body: form });
 
   if (!response.ok) {
     let msg = `PPTX conversion failed (${response.status})`;
@@ -95,7 +98,7 @@ export async function convertToPptx(file: File, title?: string): Promise<PptxRep
 }
 
 export async function getChatStatus(): Promise<ChatStatus> {
-  const response = await fetch('/api/chat/status');
+  const response = await fetch(`${API_BASE}/api/chat/status`);
 
   if (!response.ok) {
     throw new Error('Chat status request failed');
@@ -109,7 +112,7 @@ export async function sendChatMessage(
   mode: ChatMode,
   dataContext?: DataContext
 ): Promise<ChatReply> {
-  const response = await fetch('/api/chat', {
+  const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, mode, dataContext })
@@ -137,7 +140,7 @@ export async function uploadFile(file: File): Promise<FinanceDataset> {
   const form = new FormData();
   form.append('file', file);
 
-  const response = await fetch('/api/upload', { method: 'POST', body: form });
+  const response = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
 
   if (!response.ok) {
     const err = (await response.json()) as { error?: string };
@@ -148,7 +151,7 @@ export async function uploadFile(file: File): Promise<FinanceDataset> {
 }
 
 export async function analyseData(sourceType: SourceType, sourceConfig: Record<string, unknown>): Promise<DecisionPackage> {
-  const response = await fetch('/api/analyse', {
+  const response = await fetch(`${API_BASE}/api/analyse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sourceType, sourceConfig })
