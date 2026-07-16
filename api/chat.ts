@@ -1,3 +1,4 @@
+// v2 — skill-aware routing: skills/@context/data/vector/graph → Context Studio; web-search is last-resort fallback
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
