@@ -225,7 +225,8 @@ function analysisTool(dataset: FinanceDataset): AnalysisResult {
   const marginField          = findField(fields, ['marginpct', 'margin %', 'margin']);
   const stageField           = findField(fields, ['stage', 'status']);
 
-  const totals = rows.reduce((acc, row) => {
+  interface Totals { actualRevenue: number; forecastRevenue: number; actualCost: number; forecastCost: number; margin: number }
+  const totals = rows.reduce<Totals>((acc, row) => {
     acc.actualRevenue   += getNumber(row, actualRevenueField);
     acc.forecastRevenue += getNumber(row, forecastRevenueField);
     acc.actualCost      += getNumber(row, actualCostField);
