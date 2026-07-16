@@ -7,7 +7,7 @@
  * ONLY from here, never from the internet.
  */
 
-import { readFileSync } from 'fs';
+import { ibmAnnualReports } from './data/ibmAnnualReports.js';
 
 // ── Raw dataset types (mirror ibm-annual-reports.json) ───────────────────────
 
@@ -137,9 +137,10 @@ export interface DashboardPackage {
 }
 
 // ── Load dataset once at startup ──────────────────────────────────────────────
+// Bundled as a TS module (no fs / import.meta) so the same code runs in the
+// Express server, tsx dev, and Vercel serverless functions.
 
-const datasetUrl = new URL('../data/ibm-annual-reports.json', import.meta.url);
-const dataset: IbmDataset = JSON.parse(readFileSync(datasetUrl, 'utf-8')) as IbmDataset;
+const dataset: IbmDataset = ibmAnnualReports;
 
 export function getDataset(): IbmDataset {
   return dataset;
