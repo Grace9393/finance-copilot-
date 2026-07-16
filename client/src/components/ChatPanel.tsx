@@ -187,9 +187,11 @@ function JsonTable({ data }: { data: unknown }) {
 
 /** Convert a limited subset of markdown to HTML-safe JSX spans. */
 function renderMarkdownLine(line: string, key: number): React.ReactNode {
+  // Bullet lines: strip the marker so it is not rendered twice
+  const isBullet = line.startsWith('• ') || line.startsWith('- ') || line.startsWith('* ');
   // Replace **bold**, [text](url), bare https:// links
   const parts: React.ReactNode[] = [];
-  let rest = line;
+  let rest = isBullet ? line.slice(2) : line;
   let i = 0;
 
   const push = (chunk: string) => {
@@ -219,7 +221,7 @@ function renderMarkdownLine(line: string, key: number): React.ReactNode {
   // Blockquote
   if (line.startsWith('> ')) return <blockquote key={key} style={{ margin: '2px 0', paddingLeft: 10, borderLeft: '3px solid #cbd5e1', color: '#475569' }}>{parts}</blockquote>;
   // Bullet
-  if (line.startsWith('• ') || line.startsWith('- ') || line.startsWith('* ')) return <div key={key} style={{ paddingLeft: 12 }}>• {parts}</div>;
+  if (isBullet) return <div key={key} style={{ paddingLeft: 12 }}>• {parts}</div>;
 
   return <div key={key}>{parts}</div>;
 }
@@ -265,14 +267,42 @@ function PptxDownloadButton({ pptx }: { pptx: PptxReply }) {
   );
 }
 
+/** Split a message into alternating markdown and parsed-JSON segments so a
+ *  reply can contain multiple tables. */
+function splitJsonSegments(text: string): { type: 'md' | 'json'; content: string; data?: unknown }[] {
+  const segments: { type: 'md' | 'json'; content: string; data?: unknown }[] = [];
+  const fence = /```(?:json)?\s*([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = fence.exec(text)) !== null) {
+    let data: unknown;
+    try { data = JSON.parse(match[1].trim()); } catch { continue; }
+    const pre = text.slice(lastIndex, match.index).trim();
+    if (pre) segments.push({ type: 'md', content: pre });
+    segments.push({ type: 'json', content: match[0], data });
+    lastIndex = match.index + match[0].length;
+  }
+  const tail = text.slice(lastIndex).trim();
+  if (tail) segments.push({ type: 'md', content: tail });
+  return segments;
+}
+
 function MessageContent({ text, attachmentName, pptx }: { text: string; attachmentName?: string; pptx?: PptxReply }) {
-  const extracted = extractJson(text);
+  const segments = splitJsonSegments(text);
+  const hasJsonSegments = segments.some((s) => s.type === 'json');
+  const extracted = hasJsonSegments ? null : extractJson(text);
   // Use markdown renderer when the text contains markdown markers
   const hasMarkdown = /\*\*|^#{1,3} |^\> |\[.+\]\(https?:/m.test(text);
   return (
     <>
       {attachmentName && <div className="chat-attachment-tag">📎 {attachmentName}</div>}
-      {extracted ? (
+      {hasJsonSegments ? (
+        segments.map((segment, i) =>
+          segment.type === 'json'
+            ? <JsonTable key={i} data={segment.data} />
+            : <MarkdownText key={i} text={segment.content} />
+        )
+      ) : extracted ? (
         <>
           {extracted.pre && <MarkdownText text={extracted.pre} />}
           <JsonTable data={extracted.data} />
@@ -372,12 +402,24 @@ function FileZone({ pendingFile, uploading, uploadedName, onFile, onClear }: Fil
 
 // ── ChatPanel (main) ──────────────────────────────────────────────────────────
 
+export interface ChatSuggestion {
+  label: string;
+  prompt: string;
+}
+
 interface ChatPanelProps {
   dataContext?: DataContext;
   onDataContextChange?: (ctx: DataContext) => void;
+  /** Optional override for the first assistant message */
+  welcomeText?: string;
+  /** Suggested enquiry chips rendered above the input row */
+  suggestions?: ChatSuggestion[];
 }
 
-export function ChatPanel({ dataContext, onDataContextChange }: ChatPanelProps) {
+const DEFAULT_WELCOME =
+  'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.';
+
+export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: nextId(),
@@ -627,6 +669,23 @@ export function ChatPanel({ dataContext, onDataContextChange }: ChatPanelProps) 
           onClear={handleClearFile}
         />
       </div>
+
+      {/* Suggested enquiry chips */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="chat-suggestions">
+          {suggestions.map((s) => (
+            <button
+              key={s.label}
+              className="chat-suggestion-chip"
+              type="button"
+              title={s.prompt}
+              onClick={() => { setInput(s.prompt); setMode('hybrid'); setTimeout(() => inputRef.current?.focus(), 50); }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input row */}
       <div className="chat-input-row">

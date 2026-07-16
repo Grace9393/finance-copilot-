@@ -1,0 +1,127 @@
+{
+  "company": "IBM",
+  "currency": "USD millions",
+  "fiscalYears": [2023, 2024, 2025],
+  "description": "Key financials ingested from IBM's last three annual reports (FY2023, FY2024, FY2025 10-K / Q4 press releases). Acts as the internal finance / EPM data source for the POC.",
+  "sources": [
+    "https://newsroom.ibm.com/2026-01-28-IBM-RELEASES-FOURTH-QUARTER-RESULTS",
+    "https://www.sec.gov/Archives/edgar/data/51143/000005114326000010/ibm-20251231.htm",
+    "https://www.sec.gov/Archives/edgar/data/51143/000005114326000027/ibmars2025.pdf",
+    "https://www.sec.gov/Archives/edgar/data/51143/000005114325000015/Financial_Report.xlsx"
+  ],
+  "provenance": {
+    "reported": "Figure as reported in IBM annual report / 10-K / Q4 earnings release",
+    "derived": "Figure derived from reported totals and reported growth rates",
+    "illustrative": "Illustrative EPM-style detail added for POC configurability; not disclosed at this granularity in public filings"
+  },
+  "annual": [
+    {
+      "year": 2023,
+      "revenue": 61860,
+      "revenueGrowthPct": 2.2,
+      "grossProfit": 34300,
+      "grossMarginPct": 55.4,
+      "netIncome": 7502,
+      "netMarginPct": 12.1,
+      "freeCashFlow": 11236,
+      "operatingCashFlow": 13931,
+      "cashAndEquivalents": 13068,
+      "shortTermInvestments": 373,
+      "cashAndSecurities": 13441,
+      "accountsReceivable": 7214,
+      "inventory": 1161,
+      "totalDebt": 56540,
+      "totalAssets": 135241,
+      "provenance": "reported"
+    },
+    {
+      "year": 2024,
+      "revenue": 62753,
+      "revenueGrowthPct": 1.4,
+      "grossProfit": 35551,
+      "grossMarginPct": 56.7,
+      "netIncome": 6023,
+      "netMarginPct": 9.6,
+      "freeCashFlow": 12749,
+      "operatingCashFlow": 13445,
+      "cashAndEquivalents": 13947,
+      "shortTermInvestments": 644,
+      "cashAndSecurities": 14591,
+      "accountsReceivable": 6804,
+      "inventory": 959,
+      "totalDebt": 54973,
+      "totalAssets": 137175,
+      "provenance": "reported",
+      "notes": "Net income includes a one-time non-cash pension settlement charge; underlying profitability improved year over year."
+    },
+    {
+      "year": 2025,
+      "revenue": 67472,
+      "revenueGrowthPct": 7.5,
+      "grossProfit": 39297,
+      "grossMarginPct": 58.2,
+      "netIncome": 10593,
+      "netMarginPct": 15.7,
+      "freeCashFlow": 14734,
+      "operatingCashFlow": 13193,
+      "cashAndEquivalents": 13587,
+      "shortTermInvestments": 830,
+      "cashAndSecurities": 14417,
+      "accountsReceivable": 8112,
+      "inventory": 1084,
+      "totalDebt": 61260,
+      "totalAssets": 151880,
+      "provenance": "reported",
+      "notes": "Free cash flow uses IBM's definition (excludes financing receivables). Gross margin expanded 150 bps on software mix."
+    }
+  ],
+  "segments": [
+    { "year": 2023, "segment": "Software", "revenue": 26330, "growthPct": 5.1, "provenance": "reported" },
+    { "year": 2023, "segment": "Consulting", "revenue": 19985, "growthPct": 4.6, "provenance": "reported" },
+    { "year": 2023, "segment": "Infrastructure", "revenue": 14625, "growthPct": -4.3, "provenance": "reported", "notes": "z16 mainframe cycle wind-down; distributed infrastructure demand normalised post-pandemic." },
+    { "year": 2023, "segment": "Financing", "revenue": 741, "growthPct": 15.9, "provenance": "reported" },
+    { "year": 2023, "segment": "Other", "revenue": 179, "growthPct": 0, "provenance": "derived" },
+    { "year": 2024, "segment": "Software", "revenue": 27085, "growthPct": 2.9, "provenance": "reported", "notes": "Hybrid Platform & Solutions and Red Hat growth, partly offset by transaction processing timing." },
+    { "year": 2024, "segment": "Consulting", "revenue": 20692, "growthPct": 3.5, "provenance": "reported", "notes": "Clients reprioritised discretionary spend toward AI programmes; backlog remained healthy." },
+    { "year": 2024, "segment": "Infrastructure", "revenue": 14020, "growthPct": -4.1, "provenance": "reported", "notes": "Declining z16 product cycle ahead of the z17 launch; Power and storage demand soft." },
+    { "year": 2024, "segment": "Financing", "revenue": 713, "growthPct": -3.8, "provenance": "reported" },
+    { "year": 2024, "segment": "Other", "revenue": 243, "growthPct": 35.8, "provenance": "derived" },
+    { "year": 2025, "segment": "Software", "revenue": 29962, "growthPct": 10.6, "provenance": "reported", "notes": "Generative AI book of business exceeded $12.5B inception-to-date; automation and data platforms accelerated." },
+    { "year": 2025, "segment": "Consulting", "revenue": 21055, "growthPct": 1.8, "provenance": "reported", "notes": "AI-led signings grew while conventional application work stayed muted." },
+    { "year": 2025, "segment": "Infrastructure", "revenue": 15718, "growthPct": 12.1, "provenance": "reported", "notes": "z17 mainframe cycle launch drove double-digit growth." },
+    { "year": 2025, "segment": "Financing", "revenue": 737, "growthPct": 3.4, "provenance": "reported" }
+  ],
+  "geographies": [
+    { "year": 2023, "geo": "Americas", "revenue": 31700, "growthPct": 3.4, "provenance": "derived" },
+    { "year": 2023, "geo": "EMEA", "revenue": 18473, "growthPct": 4.0, "provenance": "derived" },
+    { "year": 2023, "geo": "Asia Pacific", "revenue": 11687, "growthPct": -3.0, "provenance": "derived" },
+    { "year": 2024, "geo": "Americas", "revenue": 31300, "growthPct": -1.3, "provenance": "reported" },
+    { "year": 2024, "geo": "EMEA", "revenue": 19415, "growthPct": 5.1, "provenance": "reported" },
+    { "year": 2024, "geo": "Asia Pacific", "revenue": 12038, "growthPct": 3.0, "provenance": "reported" },
+    { "year": 2025, "geo": "Americas", "revenue": 33318, "growthPct": 6.6, "provenance": "reported" },
+    { "year": 2025, "geo": "EMEA", "revenue": 22166, "growthPct": 14.2, "provenance": "reported" },
+    { "year": 2025, "geo": "Asia Pacific", "revenue": 11988, "growthPct": -0.4, "provenance": "reported" }
+  ],
+  "countryShares": {
+    "provenance": "illustrative",
+    "note": "Country-level split inside each geography is an illustrative allocation for POC configurability. Geography totals are as reported/derived above.",
+    "Americas": { "United States": 0.78, "Canada": 0.08, "Brazil": 0.07, "Mexico": 0.04, "Other Americas": 0.03 },
+    "EMEA": { "United Kingdom": 0.22, "Germany": 0.2, "France": 0.14, "Middle East & Africa": 0.16, "Italy": 0.08, "Spain": 0.06, "Other Europe": 0.14 },
+    "Asia Pacific": { "Japan": 0.45, "India": 0.18, "Australia": 0.12, "China": 0.1, "Other APAC": 0.15 }
+  },
+  "workingCapitalDetail": {
+    "provenance": "illustrative",
+    "note": "AR-by-geo allocation and inventory buckets are illustrative EPM/ISC-style detail; totals per year match reported balance-sheet figures.",
+    "arDaysByGeo": { "Americas": 36, "EMEA": 46, "Asia Pacific": 42 },
+    "inventoryBuckets": [
+      { "year": 2023, "soldNotDelivered": 209, "excessAndObsolete": 128, "inTransit": 139, "rawAndWip": 685 },
+      { "year": 2024, "soldNotDelivered": 173, "excessAndObsolete": 96, "inTransit": 115, "rawAndWip": 575 },
+      { "year": 2025, "soldNotDelivered": 195, "excessAndObsolete": 87, "inTransit": 130, "rawAndWip": 672 }
+    ]
+  },
+  "keyInsights": [
+    { "year": 2023, "insight": "Revenue grew 2.2% to $61.9B. Software (+5.1%) and Consulting (+4.6%) offset the Infrastructure decline (-4.3%) as the z16 cycle wound down. Gross margin reached 55.4% and free cash flow $11.2B." },
+    { "year": 2024, "insight": "Revenue grew 1.4% to $62.8B. Software (+2.9%) and Consulting (+3.5%) grew while Infrastructure fell 4.1% ahead of the z17 launch. Gross margin expanded 130 bps to 56.7%; free cash flow rose to $12.7B. Net income was depressed by a one-time pension settlement charge." },
+    { "year": 2025, "insight": "Revenue grew 7.5% to $67.5B — the strongest year of the three. Software (+10.6%) passed a $12.5B generative-AI book of business, Infrastructure (+12.1%) rode the z17 cycle, and EMEA (+14.2%) led all geographies. Gross margin hit 58.2% and free cash flow a record $14.7B." }
+  ]
+}

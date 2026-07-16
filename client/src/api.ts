@@ -152,6 +152,90 @@ export async function uploadFile(file: File): Promise<FinanceDataset> {
   return (await response.json()) as FinanceDataset;
 }
 
+// ── Section 1: configurable dashboard (internal finance / EPM only) ──────────
+
+export interface KpiTile {
+  label: string;
+  value: string;
+  deltaLabel: string;
+  direction: 'up' | 'down' | 'flat';
+  favourable: boolean;
+}
+
+export interface SeriesPoint {
+  label: string;
+  value: number;
+  growthPct?: number;
+  notes?: string;
+}
+
+export interface TrendSeries {
+  name: string;
+  points: { year: number; value: number }[];
+}
+
+export interface PnlRow {
+  line: string;
+  fy2023: string;
+  fy2024: string;
+  fy2025: string;
+  yoy: string;
+  direction: 'up' | 'down' | 'flat';
+}
+
+export interface DashboardPackage {
+  company: string;
+  year: number;
+  geo: string;
+  country: string;
+  segment: string;
+  scopeNote: string;
+  kpis: KpiTile[];
+  keyInsight: string;
+  revenueBySegment: SeriesPoint[];
+  revenueByGeo: SeriesPoint[];
+  trend: TrendSeries[];
+  trendYears: number[];
+  pnl: PnlRow[];
+  workingCapital: {
+    rows: { metric: string; value: string; detail: string }[];
+    arByGeo: { geo: string; ar: number; days: number }[];
+    inventoryBuckets: { bucket: string; value: number }[];
+    note: string;
+  };
+  risks: { driver: string; impact: string; severity: 'high' | 'medium' | 'low' }[];
+  actions: { action: string; category: string; status: string }[];
+  sources: string[];
+}
+
+export interface FilterOptions {
+  years: number[];
+  geographies: string[];
+  countries: Record<string, string[]>;
+  segments: string[];
+}
+
+export async function fetchFilterOptions(): Promise<FilterOptions> {
+  const response = await fetch(`${API_BASE}/api/dashboard/options`);
+  if (!response.ok) throw new Error('Failed to load filter options');
+  return (await response.json()) as FilterOptions;
+}
+
+export async function fetchDashboard(params: { year?: number; geo?: string; country?: string; segment?: string }): Promise<DashboardPackage> {
+  const query = new URLSearchParams();
+  if (params.year) query.set('year', String(params.year));
+  if (params.geo) query.set('geo', params.geo);
+  if (params.country) query.set('country', params.country);
+  if (params.segment) query.set('segment', params.segment);
+
+  const response = await fetch(`${API_BASE}/api/dashboard?${query.toString()}`);
+  if (!response.ok) {
+    const error = (await response.json()) as { error?: string };
+    throw new Error(error.error ?? 'Dashboard request failed');
+  }
+  return (await response.json()) as DashboardPackage;
+}
+
 export async function analyseData(sourceType: SourceType, sourceConfig: Record<string, unknown>): Promise<DecisionPackage> {
   const response = await fetch(`${API_BASE}/api/analyse`, {
     method: 'POST',

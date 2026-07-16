@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { analyseRouter } from './routes/analyse.js';
 import { chatRouter } from './routes/chat.js';
+import { dashboardRouter } from './routes/dashboard.js';
 import { uploadRouter } from './routes/upload.js';
 import { pptxRouter } from './routes/pptx.js';
 
@@ -21,6 +22,7 @@ app.get('/api/health', (_request, response) => {
 });
 
 app.use('/api/analyse', analyseRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/pptx', pptxRouter);
