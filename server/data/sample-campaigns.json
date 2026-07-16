@@ -1,0 +1,29 @@
+[
+  {
+    "CampaignName": "Margin Rescue",
+    "Market": "North America",
+    "Theme": "Cost Control",
+    "PipelineInfluenced": 490900,
+    "MarketingSpend": 14300,
+    "WinInfluenceProbability": 54,
+    "AttentionScore": 87
+  },
+  {
+    "CampaignName": "Pipeline Push",
+    "Market": "EMEA",
+    "Theme": "Revenue Growth",
+    "PipelineInfluenced": 390500,
+    "MarketingSpend": 30300,
+    "WinInfluenceProbability": 30,
+    "AttentionScore": 86
+  },
+  {
+    "CampaignName": "Executive Reach",
+    "Market": "APAC",
+    "Theme": "Value Selling",
+    "PipelineInfluenced": 234200,
+    "MarketingSpend": 25100,
+    "WinInfluenceProbability": 52,
+    "AttentionScore": 87
+  }
+]

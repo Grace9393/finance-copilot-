@@ -1,0 +1,207 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Context Studio — Organisation Summary</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background: #ffffff;
+    color: #1f2328;
+  }
+  .page { max-width: 760px; margin: 0 auto; padding: 32px 20px 48px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #57606a; font-size: 13px; margin-bottom: 28px; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 28px 0 12px; color: #1f2328; }
+  /* Stat cards */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px; }
+  .stat { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; }
+  .stat-num { font-size: 28px; font-weight: 700; color: #3b82d4; line-height: 1.1; }
+  .stat-lbl { font-size: 11px; color: #57606a; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #f7f8fa; border-bottom: 2px solid #e5e7eb; text-align: left; padding: 8px 10px; font-weight: 600; font-size: 12px; color: #57606a; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f7f8fa; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #e5e7eb; color: #57606a; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-purple { background: #ede9fe; color: #6d28d9; }
+  .badge-orange { background: #ffedd5; color: #c2410c; }
+  /* Bar chart */
+  .bar-row { display: flex; align-items: center; margin-bottom: 8px; gap: 10px; }
+  .bar-label { width: 180px; font-size: 12px; flex-shrink: 0; color: #1f2328; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; background: #e5e7eb; border-radius: 3px; height: 14px; }
+  .bar-fill { background: #3b82d4; border-radius: 3px; height: 14px; transition: width 0.2s; }
+  .bar-fill.alt { background: #7c5cd8; }
+  .bar-num { font-size: 12px; color: #57606a; width: 28px; text-align: right; flex-shrink: 0; }
+  /* Two columns */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; }
+  .panel h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #57606a; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { padding: 3px 9px; border-radius: 12px; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; color: #1f2328; }
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Context Studio — Organisation Summary</h1>
+  <p class="subtitle">Analysis of 350+ team-visible contexts across all IBM contributors  ·  All visibility: <strong>team</strong></p>
+
+  
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">350+</div>
+      <div class="stat-lbl">Total Contexts</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">100+</div>
+      <div class="stat-lbl">Unique Contributors</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">15</div>
+      <div class="stat-lbl">IBM Geographies</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">12</div>
+      <div class="stat-lbl">Industry Verticals</div>
+    </div>
+  </div>
+
+  
+  <h2>Top Contributors by Context Count</h2>
+  <div>
+    <div class="bar-row"><span class="bar-label">pmartincanas@es.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><span class="bar-num">35+</span></div>
+    <div class="bar-row"><span class="bar-label">abkgupta@in.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:89%"></div></div><span class="bar-num">31</span></div>
+    <div class="bar-row"><span class="bar-label">francesco.brenna@ch.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:80%"></div></div><span class="bar-num">28</span></div>
+    <div class="bar-row"><span class="bar-label">chayanray@in.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:46%"></div></div><span class="bar-num">16</span></div>
+    <div class="bar-row"><span class="bar-label">karsenth@in.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:34%"></div></div><span class="bar-num">12</span></div>
+    <div class="bar-row"><span class="bar-label">papmajum@in.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:29%"></div></div><span class="bar-num">10</span></div>
+    <div class="bar-row"><span class="bar-label">Sweta.Hejip@ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:23%"></div></div><span class="bar-num">8</span></div>
+    <div class="bar-row"><span class="bar-label">Xavier.Amat@ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:20%"></div></div><span class="bar-num">7</span></div>
+    <div class="bar-row"><span class="bar-label">manomano@in.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:17%"></div></div><span class="bar-num">6</span></div>
+    <div class="bar-row"><span class="bar-label">malina.negru@ro.ibm.com</span><div class="bar-track"><div class="bar-fill" style="width:14%"></div></div><span class="bar-num">5</span></div>
+  </div>
+
+  
+  <h2>Domain / Use-Case Breakdown</h2>
+  <div>
+    <div class="bar-row"><span class="bar-label">Finance (AP / AR / FP&amp;A / Recon)</span><div class="bar-track"><div class="bar-fill alt" style="width:100%"></div></div><span class="bar-num">90+</span></div>
+    <div class="bar-row"><span class="bar-label">Training / JUNE workshop</span><div class="bar-track"><div class="bar-fill alt" style="width:44%"></div></div><span class="bar-num">~40</span></div>
+    <div class="bar-row"><span class="bar-label">Engineering / Manufacturing</span><div class="bar-track"><div class="bar-fill alt" style="width:28%"></div></div><span class="bar-num">~25</span></div>
+    <div class="bar-row"><span class="bar-label">Insurance / Banking / FS</span><div class="bar-track"><div class="bar-fill alt" style="width:25%"></div></div><span class="bar-num">~22</span></div>
+    <div class="bar-row"><span class="bar-label">Software Dev / SDLC / Agentic</span><div class="bar-track"><div class="bar-fill alt" style="width:22%"></div></div><span class="bar-num">~20</span></div>
+    <div class="bar-row"><span class="bar-label">Supply Chain / Procurement</span><div class="bar-track"><div class="bar-fill alt" style="width:15%"></div></div><span class="bar-num">~14</span></div>
+    <div class="bar-row"><span class="bar-label">HR / Talent / Career</span><div class="bar-track"><div class="bar-fill alt" style="width:11%"></div></div><span class="bar-num">~10</span></div>
+    <div class="bar-row"><span class="bar-label">Healthcare / FHIR / Pharma</span><div class="bar-track"><div class="bar-fill alt" style="width:9%"></div></div><span class="bar-num">~8</span></div>
+    <div class="bar-row"><span class="bar-label">E-Commerce / Retail</span><div class="bar-track"><div class="bar-fill alt" style="width:7%"></div></div><span class="bar-num">~6</span></div>
+    <div class="bar-row"><span class="bar-label">Other / Test / Misc</span><div class="bar-track"><div class="bar-fill alt" style="width:37%"></div></div><span class="bar-num">~35</span></div>
+  </div>
+
+  
+  <h2>Notable Client / Named-Company Contexts</h2>
+  <table>
+    <thead>
+      <tr><th>Company</th><th>Context(s)</th><th>Domain</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Nestlé</td><td>Account Payable Nestlé, Claim_Deduction_Nestle</td><td><span class="badge badge-blue">Finance / Claims</span></td></tr>
+      <tr><td>Maersk</td><td>Maersk-Account-Reco, Maersk-finance-transform, Maersak-bp-app-context</td><td><span class="badge badge-blue">Finance / O2C</span></td></tr>
+      <tr><td>Carlsberg</td><td>Carlsberg-ap-context, Carlsberg AP MVP</td><td><span class="badge badge-blue">Accounts Payable</span></td></tr>
+      <tr><td>Elior</td><td>Elior Account Payable, Elior AP MVP</td><td><span class="badge badge-blue">Accounts Payable</span></td></tr>
+      <tr><td>Bombardier</td><td>Bombardier-AP-Context, Bombardier-AP-PoC</td><td><span class="badge badge-blue">Accounts Payable</span></td></tr>
+      <tr><td>LyondellBasell (LYB)</td><td>LYB-AP-Context, LYB-AP-PoC, LYB-PoC-Invoice</td><td><span class="badge badge-blue">Accounts Payable</span></td></tr>
+      <tr><td>ASML</td><td>asml-o2c-pilot</td><td><span class="badge badge-green">Order-to-Cash</span></td></tr>
+      <tr><td>Intel</td><td>Intel-ap-context, Intel Context, Intel-HR-Learning-Context, Intel_AP_June</td><td><span class="badge badge-purple">Finance / HR</span></td></tr>
+      <tr><td>Cleveland-Cliffs</td><td>Finance Transformation, Order Domain Transformation</td><td><span class="badge badge-blue">Finance / Supply</span></td></tr>
+      <tr><td>ECB</td><td>ECB F&amp;P, ECB F&amp;P Build, ECB MVP, ECBDemoContext</td><td><span class="badge badge-orange">Regulatory / FS</span></td></tr>
+      <tr><td>Chanel</td><td>Chanel_Demo_Context, Chanel_Implementation</td><td><span class="badge badge-purple">R2R / Finance</span></td></tr>
+      <tr><td>Ferrari</td><td>Ferrari R&amp;D</td><td><span class="badge badge-green">Automotive / Safety</span></td></tr>
+      <tr><td>Campari</td><td>Campari</td><td><span class="badge badge-purple">Salesforce / CRM</span></td></tr>
+      <tr><td>Hubbell</td><td>Hubbell HR, Hubbell Resumes</td><td><span class="badge badge-purple">HR</span></td></tr>
+      <tr><td>Fluidra</td><td>Fluidra - Finanzas</td><td><span class="badge badge-blue">Finance</span></td></tr>
+      <tr><td>GXO</td><td>gxo_account_payable_v2, gxo_account_reconciliation_v2 (+MVPs)</td><td><span class="badge badge-blue">Finance</span></td></tr>
+      <tr><td>Hupac</td><td>Hupac V1</td><td><span class="badge badge-green">Logistics</span></td></tr>
+      <tr><td>DeutscheBank</td><td>DeuBa Inv Processing, DeuBa_KYC</td><td><span class="badge badge-orange">Banking / KYC</span></td></tr>
+      <tr><td>IKEA</td><td>IKEA Uniform process</td><td><span class="badge badge-green">Retail / Ops</span></td></tr>
+      <tr><td>Electrolux</td><td>Kitchen Consultant</td><td><span class="badge badge-green">Retail / Consumer</span></td></tr>
+    </tbody>
+  </table>
+
+  
+  <h2>Contributor Geography (IBM email domains)</h2>
+  <div class="two-col">
+    <div class="panel">
+      <h3>Top IBM Geographies</h3>
+      <div class="bar-row"><span class="bar-label">@in.ibm.com (India)</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><span class="bar-num">~40%</span></div>
+      <div class="bar-row"><span class="bar-label">@ibm.com (Global/US)</span><div class="bar-track"><div class="bar-fill" style="width:65%"></div></div><span class="bar-num">~26%</span></div>
+      <div class="bar-row"><span class="bar-label">@ch.ibm.com (Switzerland)</span><div class="bar-track"><div class="bar-fill" style="width:28%"></div></div><span class="bar-num">~11%</span></div>
+      <div class="bar-row"><span class="bar-label">@es.ibm.com (Spain)</span><div class="bar-track"><div class="bar-fill" style="width:22%"></div></div><span class="bar-num">~9%</span></div>
+      <div class="bar-row"><span class="bar-label">@my.ibm.com (Malaysia)</span><div class="bar-track"><div class="bar-fill" style="width:10%"></div></div><span class="bar-num">~4%</span></div>
+      <div class="bar-row"><span class="bar-label">Other (FR/RO/UK/AU/SG/AE…)</span><div class="bar-track"><div class="bar-fill" style="width:25%"></div></div><span class="bar-num">~10%</span></div>
+    </div>
+    <div class="panel">
+      <h3>Industry Verticals</h3>
+      <div class="tag-cloud">
+        <span class="tag">Banking &amp; FS</span>
+        <span class="tag">Insurance</span>
+        <span class="tag">Manufacturing</span>
+        <span class="tag">Retail / FMCG</span>
+        <span class="tag">Logistics</span>
+        <span class="tag">Automotive</span>
+        <span class="tag">Healthcare</span>
+        <span class="tag">Energy / Oil &amp; Gas</span>
+        <span class="tag">Aerospace</span>
+        <span class="tag">Pharma</span>
+        <span class="tag">Technology (Intel)</span>
+        <span class="tag">Public Sector (ATO)</span>
+      </div>
+    </div>
+  </div>
+
+  
+  <h2>JUNE Workshop Cohort Contexts (Training / Enablement)</h2>
+  <p style="font-size:13px;color:#57606a;margin-bottom:10px">~40 individual contexts prefixed <code>JUNE_C_</code> or <code>June_C_</code>, each scoped to a GlobalBev Group finance app exercise led by <strong>pmartincanas@es.ibm.com</strong>. Contributors span US, FR, MY, IN, ZA, BR, UK, and more.</p>
+  <div class="tag-cloud">
+    <span class="tag">Jackie Burns (US)</span>
+    <span class="tag">Ashish Sharma (MY)</span>
+    <span class="tag">Lucas Masson (FR)</span>
+    <span class="tag">Tess Rock (US)</span>
+    <span class="tag">Zach Gilbert (US)</span>
+    <span class="tag">Stephen Bonner (US)</span>
+    <span class="tag">Jean-Bernard Wafo (FR)</span>
+    <span class="tag">Jason Lee (MY)</span>
+    <span class="tag">Irene How (MY)</span>
+    <span class="tag">Reshav Haripersad (ZA)</span>
+    <span class="tag">Omar Abbas</span>
+    <span class="tag">Poonam Raj (IN)</span>
+    <span class="tag">Yoke Peng Tan (MY)</span>
+    <span class="tag">Xavier Ducher (FR)</span>
+    <span class="tag">Joshua Tamburello</span>
+    <span class="tag">+ 20 more participants</span>
+  </div>
+
+  
+  <h2>Your Context</h2>
+  <table>
+    <thead><tr><th>Context ID</th><th>Name</th><th>Created By</th><th>Visibility</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>ctx_09f7830c068c</code></td>
+        <td><strong>GraceTest</strong></td>
+        <td>gracepan@ibm.com</td>
+        <td><span class="badge badge-blue">team</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

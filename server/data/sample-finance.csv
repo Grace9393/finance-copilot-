@@ -1,0 +1,13 @@
+Quarter,Product,Region,ActualRevenue,ForecastRevenue,ActualCost,ForecastCost,MarginPct,DealName,Stage,CloseDate,CampaignName,Theme
+Jan,Analytics,NA,180000,200000,122000,115000,32.2,Northstar Renewal,Won,2025-01-25,Margin Rescue,Cost Control
+Jan,Automation,EMEA,145000,160000,104000,92000,28.3,Factory Flow,Pipeline,2025-01-28,Pipeline Push,Revenue Growth
+Jan,Consulting,APAC,210000,205000,136000,130000,35.2,Transform Advisory,Won,2025-01-31,Margin Rescue,Value Selling
+Jan,Security,NA,125000,150000,98000,87000,21.6,Shield Expansion,Pipeline,2025-01-29,Retention Guard,Risk Reduction
+Feb,Analytics,NA,195000,215000,131000,120000,32.8,Data Edge,Won,2025-02-18,Margin Rescue,Cost Control
+Feb,Automation,EMEA,155000,175000,112000,98000,27.7,Workflow One,Pipeline,2025-02-22,Pipeline Push,Revenue Growth
+Feb,Consulting,APAC,225000,230000,145000,138000,35.6,Growth Advisory,Won,2025-02-26,Executive Reach,Value Selling
+Feb,Security,NA,132000,152000,101000,90000,23.5,Cyber Core,Pipeline,2025-02-20,Retention Guard,Risk Reduction
+Mar,Analytics,NA,205000,225000,140000,126000,31.7,Insight 360,Won,2025-03-17,Executive Reach,Cost Control
+Mar,Automation,EMEA,162000,185000,118000,102000,27.2,Ops Modernise,Pipeline,2025-03-24,Pipeline Push,Revenue Growth
+Mar,Consulting,APAC,235000,240000,150000,142000,36.2,Strategy Lift,Won,2025-03-27,Executive Reach,Value Selling
+Mar,Security,NA,138000,160000,106000,94000,23.2,Trust Upgrade,Pipeline,2025-03-29,Retention Guard,Risk Reduction
