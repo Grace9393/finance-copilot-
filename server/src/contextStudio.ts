@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 export interface ContextStudioConfig {
   url: string;
   bearerToken: string;
@@ -28,20 +24,31 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-
+// Reset per-invocation in serverless — no module-level state persists between cold starts
 let cachedConfig: ContextStudioConfig | null = null;
+// Also reset session state so each serverless invocation gets a fresh MCP session
+
+function loadFileConfig(): Partial<ContextStudioConfig> {
+  // Try to load from file (local dev only) — silently skip if missing
+  try {
+    // Dynamic require to avoid import.meta issues in commonjs/serverless environments
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const data = require('../context-studio.json') as ContextStudioConfig;
+    return data;
+  } catch {
+    return {};
+  }
+}
 
 export function getConfig(): ContextStudioConfig {
   if (!cachedConfig) {
-    const raw = readFileSync(join(moduleDir, '..', 'context-studio.json'), 'utf-8');
-    const fileConfig = JSON.parse(raw) as ContextStudioConfig;
+    const file = loadFileConfig();
     cachedConfig = {
-      url: process.env.CONTEXT_STUDIO_URL ?? fileConfig.url,
-      bearerToken: process.env.CONTEXT_STUDIO_BEARER ?? fileConfig.bearerToken,
-      apiKey: process.env.CONTEXT_STUDIO_API_KEY ?? fileConfig.apiKey,
-      contextId: process.env.CONTEXT_STUDIO_CONTEXT_ID ?? fileConfig.contextId,
-      agentPersona: process.env.CONTEXT_STUDIO_PERSONA ?? fileConfig.agentPersona
+      url:          process.env.CONTEXT_STUDIO_URL     ?? file.url          ?? '',
+      bearerToken:  process.env.CONTEXT_STUDIO_BEARER  ?? file.bearerToken  ?? '',
+      apiKey:       process.env.CONTEXT_STUDIO_API_KEY ?? file.apiKey       ?? '',
+      contextId:    process.env.CONTEXT_STUDIO_CONTEXT_ID ?? file.contextId ?? '',
+      agentPersona: process.env.CONTEXT_STUDIO_PERSONA ?? file.agentPersona ?? 'FinanceCoPilot'
     };
   }
 
