@@ -25,6 +25,7 @@
     "@types/node": "^22.10.1",
     "@types/node-fetch": "^2.6.13",
     "@types/pdf-parse": "^1.1.5",
+    "@vercel/node": "^5.8.25",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
