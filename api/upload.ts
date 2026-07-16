@@ -108,7 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rows = normaliseRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' }));
       dataset = { source: originalname, fields: rows[0] ? Object.keys(rows[0]) : [], rows, fetchedAt: new Date().toISOString() };
     } else if (ext === '.pdf' || mimetype === 'application/pdf') {
-      const { default: pdfParse } = await import('pdf-parse') as { default: (buf: Buffer) => Promise<{ text: string }> };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfModule = await import('pdf-parse') as any;
+      const pdfParse = (pdfModule.default ?? pdfModule) as (buf: Buffer) => Promise<{ text: string }>;
       const parsed = await pdfParse(buffer);
       if (!parsed.text?.trim()) throw new Error('PDF appears to be image-only (no extractable text).');
       dataset = textToDataset(parsed.text, originalname);
