@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { callTool, extractText, getConfig, listTools } from '../contextStudio.js';
+import { answerFromDataContext } from '../dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../reportSearch.js';
 import { detectSkillInvocation } from '../skills.js';
@@ -106,6 +107,31 @@ chatRouter.post('/', async (request, response) => {
   const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
   const skillInvocation = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
   const forceContextStudio = isExplicitCSMode || isContextPrefixed || hasDataContext || skillInvocation !== null;
+
+  // ── Data-grounded answering ──────────────────────────────────────────────────
+  // With a data source connected (upload / local path / web URL / Google Sheet /
+  // fetched report), plain hybrid questions are answered from the data itself —
+  // Context Studio's retrieval tools cannot read ad-hoc uploaded data.
+  // @context, vector/graph modes and skill invocations still go to Context Studio.
+  if (needsMessage && hasDataContext && chatMode === 'hybrid' && !isContextPrefixed && !skillInvocation) {
+    try {
+      response.json({
+        reply: answerFromDataContext(trimmedMessage, dataContext!),
+        tool: 'data-grounded',
+        mode: chatMode,
+        isError: false,
+        elapsedMs: Date.now() - startedAt
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: error instanceof Error ? error.message : 'Data-grounded answer failed',
+        tool: 'data-grounded',
+        mode: chatMode,
+        elapsedMs: Date.now() - startedAt
+      });
+    }
+    return;
+  }
 
   // ── Finance enquiry engine (Section 2 archetypes) ────────────────────────────
   // Root-cause / ranking, projections with confidence, and cash/AR/inventory

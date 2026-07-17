@@ -1,6 +1,7 @@
 // v2 — skill-aware routing: skills/@context/data/vector/graph → Context Studio; web-search is last-resort fallback
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
+import { answerFromDataContext } from '../server/src/dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../server/src/reportSearch.js';
 import { detectSkillInvocation } from '../server/src/skills.js';
@@ -76,6 +77,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isSkill            = detectedSkill !== null;
   // Force Context Studio when: explicit mode, @context prefix, data is loaded, or a skill is invoked.
   const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
+
+  // Data-grounded answering: with a data source connected, plain hybrid
+  // questions are answered from the data itself (Context Studio retrieval
+  // cannot read ad-hoc uploads). @context / vector / graph / skills still go
+  // to Context Studio.
+  if (needsMessage && hasDataContext && chatMode === 'hybrid' && !isContextPrefix && !isSkill) {
+    try {
+      res.json({ reply: answerFromDataContext(trimmedMessage, dataContext!), tool: 'data-grounded', mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Data-grounded answer failed', tool: 'data-grounded', mode: chatMode, elapsedMs: Date.now() - startedAt });
+    }
+    return;
+  }
 
   // ── Finance enquiry engine (root cause / projection / liquidity) ──────────
   // Only runs in hybrid mode when NOT forcing Context Studio and NOT a skill.

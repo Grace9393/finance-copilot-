@@ -194,13 +194,16 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
 /**
  * Parse a Context Studio result into a readable synthesised answer.
  *
- * Context Studio tools return one of:
- *   A) content[].text — a JSON string containing { results: [...], answer?: string }
- *   B) content[].text — plain prose (already formatted)
- *   C) structuredContent — raw JSON object
+ * Observed response shapes (context-broker tools):
+ *   A) { answer: string, results: [...] }
+ *   B) { results: [...] } or top-level array of passages
+ *   C) { nodes: [...] } — graph result
+ *   D) { items: [ { content, metadata:{title, score, source_file,…} } ] } — vector query
+ *   E) { items: { vector: [...], graph: [ { graph_data:{nodes:[…]} } ], … } } — hybrid query
+ *      Graph node data lives in node.properties.properties as a stringified dict.
  *
- * We extract all text passages from the results array, deduplicate, and format
- * them as a coherent summarised answer rather than a raw JSON dump.
+ * We extract document content and graph entity data, deduplicate, and format
+ * them as a readable answer with source attribution rather than a JSON dump.
  */
 export function extractText(result: McpToolResult): string {
   // Collect all raw text blocks from content[]
@@ -262,6 +265,29 @@ function tryParseContextResult(raw: string): string | null {
 
   const data = obj as Record<string, unknown>;
 
+  // Shape D: { items: [...] } — vector query result
+  if (Array.isArray(data.items)) {
+    return formatPassages(extractPassages(data.items as unknown[]));
+  }
+
+  // Shape E: { items: { vector: [...], graph: [...], scratchpad: [...] } } — hybrid query
+  if (data.items && typeof data.items === 'object') {
+    const groups = data.items as Record<string, unknown>;
+    // Document passages first, knowledge-graph entities after
+    const order = Object.keys(groups).sort((a, b) => (a === 'graph' ? 1 : 0) - (b === 'graph' ? 1 : 0));
+    const passages: { text: string; label: string }[] = [];
+    for (const sourceName of order) {
+      const group = groups[sourceName];
+      if (!Array.isArray(group)) continue;
+      if (sourceName === 'graph') {
+        passages.push(...extractGraphPassages(group as unknown[]));
+      } else {
+        passages.push(...extractPassages(group as unknown[]));
+      }
+    }
+    return formatPassages(dedupePassages(passages));
+  }
+
   // Shape A: { answer: string, results: [...] }
   if (typeof data.answer === 'string' && data.answer.trim()) {
     const resultItems = Array.isArray(data.results) ? (data.results as unknown[]) : [];
@@ -292,30 +318,99 @@ function tryParseContextResult(raw: string): string | null {
 
 /** Pull text + metadata out of a heterogeneous passage/node array. */
 function extractPassages(items: unknown[]): { text: string; label: string }[] {
-  const seen = new Set<string>();
   const out: { text: string; label: string }[] = [];
 
   for (const item of items) {
     if (!item || typeof item !== 'object') continue;
     const p = item as ContextPassage;
+    const meta = (p.metadata && typeof p.metadata === 'object' ? p.metadata : {}) as Record<string, unknown>;
 
     const text = (p.text ?? p.content ?? p.summary ?? '').toString().trim();
     if (!text || text.length < 10) continue;
+    // Skip graph placeholder summaries ("Graph traversal with N nodes")
+    if (/^Graph traversal with \d+ nodes?$/i.test(text)) continue;
 
-    // Deduplicate by first 120 chars
-    const key = text.slice(0, 120);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const title = (p.title ?? p.name ?? p.label ?? '').toString().trim();
-    const source = (p.source ?? '').toString().trim();
-    const score = typeof p.score === 'number' ? ` (score: ${p.score.toFixed(3)})` : '';
+    const title = (p.title ?? meta.title ?? p.name ?? p.label ?? meta.section_title ?? '').toString().trim();
+    const source = (meta.source_file ?? p.source ?? '').toString().trim();
+    const scoreVal = typeof p.score === 'number' ? p.score : typeof meta.score === 'number' ? meta.score : undefined;
+    const score = typeof scoreVal === 'number' ? ` (score: ${scoreVal.toFixed(3)})` : '';
     const label = [title, source].filter(Boolean).join(' — ') + score;
 
     out.push({ text, label: label || 'Context passage' });
   }
 
-  return out;
+  return dedupePassages(out);
+}
+
+/** Deduplicate passages by leading text. */
+function dedupePassages(passages: { text: string; label: string }[]): { text: string; label: string }[] {
+  const seen = new Set<string>();
+  return passages.filter((p) => {
+    const key = p.text.slice(0, 120);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Parse a stringified python-style dict ("{'k': 'v', …}") into key/value pairs.
+ * Graph node payloads store their entity data this way.
+ */
+function parsePropsString(raw: string): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  const re = /'([^']+)':\s*'([^']*)'/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(raw)) !== null) {
+    if (match[2].trim()) out[match[1]] = match[2];
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+interface GraphNode {
+  name?: string;
+  type?: string;
+  properties?: Record<string, unknown>;
+}
+
+/**
+ * Extract readable entity data from hybrid-query graph items — the substance
+ * lives in graph_data.nodes[].properties.properties (a stringified dict).
+ * Schema/scaffolding nodes are skipped.
+ */
+function extractGraphPassages(items: unknown[]): { text: string; label: string }[] {
+  const out: { text: string; label: string }[] = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const graphData = (item as Record<string, unknown>).graph_data as { nodes?: unknown[] } | undefined;
+    if (!Array.isArray(graphData?.nodes)) continue;
+
+    for (const rawNode of graphData.nodes) {
+      if (!rawNode || typeof rawNode !== 'object') continue;
+      const node = rawNode as GraphNode;
+      const props = node.properties ?? {};
+      if (props.is_schema_node === true || String(node.type ?? '').startsWith('SchemaNode')) continue;
+
+      const propsString = typeof props.properties === 'string' ? props.properties : '';
+      const parsed = propsString ? parsePropsString(propsString) : null;
+      if (!parsed) continue;
+
+      const entityName = (parsed.name ?? node.name ?? 'Entity').toString();
+      const sourceFile = (props.source_file ?? '').toString();
+      const detailLines = Object.entries(parsed)
+        .filter(([key]) => key !== 'name')
+        .map(([key, value]) => `• ${key.replace(/_/g, ' ')}: ${value}`);
+      if (detailLines.length === 0) continue;
+
+      out.push({
+        text: detailLines.join('\n'),
+        label: [`⬡ ${entityName}`, node.type?.replace(/_/g, ' '), sourceFile].filter(Boolean).join(' — ')
+      });
+    }
+  }
+
+  return dedupePassages(out);
 }
 
 /** Format a list of passages into a readable markdown answer. */
