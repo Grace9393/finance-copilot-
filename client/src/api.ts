@@ -103,6 +103,7 @@ export interface PptxReply {
 
 /** POST an image file to /api/pptx and receive the generated PPTX as base64. */
 export async function convertToPptx(file: File, title?: string): Promise<PptxReply> {
+  assertUploadSize(file);
   const form = new FormData();
   form.append('file', file);
   if (title) form.append('title', title);
@@ -156,16 +157,41 @@ export async function sendChatMessage(
   return JSON.parse(raw) as ChatReply;
 }
 
+/** Hosted deployments (Vercel serverless) reject request bodies over ~4.5 MB. */
+export const HOSTED_UPLOAD_LIMIT_BYTES = 4.5 * 1024 * 1024;
+
+function isHostedDeployment(): boolean {
+  return typeof location !== 'undefined' && !['localhost', '127.0.0.1'].includes(location.hostname);
+}
+
+function assertUploadSize(file: File): void {
+  if (isHostedDeployment() && file.size > HOSTED_UPLOAD_LIMIT_BYTES) {
+    throw new Error(`File too large: "${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — the hosted deployment accepts up to ~4.5 MB. Split the file, or run the app locally (npm run dev) and use 📁 Local path for big files.`);
+  }
+}
+
 /** Upload a file to /api/upload and get back a FinanceDataset (used as DataContext in chat). */
 export async function uploadFile(file: File): Promise<FinanceDataset> {
+  assertUploadSize(file);
   const form = new FormData();
   form.append('file', file);
 
   const response = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
 
   if (!response.ok) {
-    const err = (await response.json()) as { error?: string };
-    throw new Error(err.error ?? `Upload failed (${response.status})`);
+    // Platform errors (413 etc.) come back as plain text, not JSON
+    if (response.status === 413) {
+      throw new Error(`File too large: "${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — the hosted deployment accepts up to ~4.5 MB. Split the file, or run the app locally (npm run dev) and use 📁 Local path for big files.`);
+    }
+    const text = await response.text().catch(() => '');
+    let message = `Upload failed (${response.status})`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      if (text) message = `Upload failed (${response.status}): ${text.slice(0, 120)}`;
+    }
+    throw new Error(message);
   }
 
   return (await response.json()) as FinanceDataset;
