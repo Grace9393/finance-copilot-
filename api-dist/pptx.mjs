@@ -54,7 +54,7 @@ function parseMultipart(buffer, boundary) {
     if (headerEnd === -1) continue;
     const headerStr = part.slice(0, headerEnd).toString();
     const data = part.slice(headerEnd + 4);
-    const cdMatch = headerStr.match(/Content-Disposition:[^\r\n]*name="([^"]*)"(?:[^\r\n]*filename="([^"]*)")?/i);
+    const cdMatch = headerStr.match(/Content-Disposition:[^\r\n]*?[;\s]name="([^"]*)"(?:[^\r\n]*?[;\s]filename="([^"]*)")?/i);
     const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
     if (!cdMatch) continue;
     const fieldName = cdMatch[1];
