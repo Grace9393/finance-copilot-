@@ -156,7 +156,7 @@ async function ensureSession(): Promise<void> {
   await rpc('initialize', {
     protocolVersion: '2025-03-26',
     capabilities: {},
-    clientInfo: { name: 'finance-copilot', version: '1.0.0' }
+    clientInfo: { name: 'finance-studio', version: '1.0.0' }
   });
   await rpc('notifications/initialized', {}, true);
   initialized = true;

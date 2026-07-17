@@ -252,7 +252,7 @@ export async function ingestLocalPath(filePath: string): Promise<IngestedDataset
 
 export async function ingestWebUrl(url: string): Promise<IngestedDataset> {
   if (!/^https?:\/\//i.test(url)) throw new Error('Web URL must start with http:// or https://');
-  const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (finance-copilot POC)' } });
+  const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (finance-studio POC)' } });
   if (!response.ok) throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
   const contentType = response.headers.get('content-type') ?? '';
   const buffer = Buffer.from(await response.arrayBuffer());
@@ -288,7 +288,7 @@ export async function ingestGoogleSheet(url: string): Promise<IngestedDataset> {
     const gid = url.match(/[#&?]gid=(\d+)/)?.[1] ?? '0';
     csvUrl = `https://docs.google.com/spreadsheets/d/${shareMatch[1]}/export?format=csv&gid=${gid}`;
   }
-  const response = await fetch(csvUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (finance-copilot POC)' } });
+  const response = await fetch(csvUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (finance-studio POC)' } });
   if (!response.ok) {
     throw new Error(`Failed to fetch Google Sheet (${response.status}). Make sure the sheet is shared as "Anyone with the link" or published to the web as CSV.`);
   }

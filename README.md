@@ -1,6 +1,6 @@
-# CFO AI Co-Pilot — Finance Co-Pilot POC
+# Finance Studio — CFO analytics POC
 
-A React + Express proof of concept for a **CFO AI Co-Pilot** with two sections:
+A React + Express proof of concept for **Finance Studio**, a CFO analytics workspace with two sections:
 
 | Section | What it does | Data sources |
 |---|---|---|

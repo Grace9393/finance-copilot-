@@ -2,7 +2,7 @@
 
 ## Top-Level Overview
 
-Build a **CFO Finance Co-Pilot** — a self-contained web application (React + Node.js/TypeScript) that answers the question:
+Build **Finance Studio** (formerly CFO Finance Co-Pilot) — a self-contained web application (React + Node.js/TypeScript) that answers the question:
 
 > *"What are the biggest risks to margin this quarter, and what actions should we take?"*
 

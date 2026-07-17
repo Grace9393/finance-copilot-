@@ -6,7 +6,7 @@ import { DashboardSection } from './components/DashboardSection';
 import { DataSourceBar, DatasetPreview } from './components/DataSourceBar';
 
 /**
- * CFO AI Co-Pilot — single-page POC:
+ * Finance Studio — single-page POC:
  *
  *  Left  · Dashboard — configurable (Year / Geography / Country / Segment),
  *          reads ONLY from internal finance systems / EPM (the ingested
@@ -63,8 +63,8 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <div className="app-title">CFO AI Co-Pilot</div>
-          <div className="app-subtitle muted">Finance Co-Pilot POC · IBM FY2023–FY2025 annual reports · Context Studio MCP</div>
+          <div className="app-title">Finance Studio</div>
+          <div className="app-subtitle muted">Finance Studio POC · IBM FY2023–FY2025 annual reports · Context Studio MCP</div>
         </div>
         <div className="header-source-pills">
           <span className="source-pill internal">⬢ Internal Finance / EPM</span>

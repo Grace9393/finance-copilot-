@@ -34,7 +34,7 @@ pptxRouter.post('/', upload.single('file'), async (req, res, next) => {
     }
 
     // Write input to a temp file
-    const tmpDir = join(tmpdir(), 'finance-copilot-pptx');
+    const tmpDir = join(tmpdir(), 'finance-studio-pptx');
     if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true });
 
     const id = randomUUID();
