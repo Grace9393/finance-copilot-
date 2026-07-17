@@ -14,10 +14,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { inflateRawSync } from 'node:zlib';
 import { parse } from 'csv-parse/sync';
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
-import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { FinanceDataset, FinanceRow, normaliseValue } from './types.js';
 
@@ -75,6 +75,42 @@ export function textToDataset(text: string, source: string): FinanceDataset {
 }
 
 // ── Office formats (docx / pptx are OPC zip packages) ─────────────────────────
+// Zip entries are read with a small built-in reader (central directory +
+// node:zlib inflate) — deliberately no zip dependency, so the Vercel function
+// bundle needs nothing beyond long-traced packages.
+
+interface ZipEntry { name: string; data: Buffer }
+
+function readZipEntries(buffer: Buffer, wanted: (name: string) => boolean): ZipEntry[] {
+  // Locate the end-of-central-directory record (scan back past any comment)
+  let eocd = -1;
+  for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 22 - 65535); i--) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error('Not a valid Office file (zip directory missing)');
+  const count = buffer.readUInt16LE(eocd + 10);
+  let offset = buffer.readUInt32LE(eocd + 16);
+  const entries: ZipEntry[] = [];
+  for (let i = 0; i < count && offset + 46 <= buffer.length; i++) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) break;
+    const compMethod = buffer.readUInt16LE(offset + 10);
+    const compSize = buffer.readUInt32LE(offset + 20);
+    const nameLen = buffer.readUInt16LE(offset + 28);
+    const extraLen = buffer.readUInt16LE(offset + 30);
+    const commentLen = buffer.readUInt16LE(offset + 32);
+    const localOffset = buffer.readUInt32LE(offset + 42);
+    const name = buffer.slice(offset + 46, offset + 46 + nameLen).toString('utf-8');
+    if (wanted(name)) {
+      const localNameLen = buffer.readUInt16LE(localOffset + 26);
+      const localExtraLen = buffer.readUInt16LE(localOffset + 28);
+      const dataStart = localOffset + 30 + localNameLen + localExtraLen;
+      const raw = buffer.slice(dataStart, dataStart + compSize);
+      entries.push({ name, data: compMethod === 0 ? raw : inflateRawSync(raw) });
+    }
+    offset += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
 
 function decodeXmlEntities(s: string): string {
   return s
@@ -83,11 +119,10 @@ function decodeXmlEntities(s: string): string {
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
 }
 
-async function extractDocxText(buffer: Buffer): Promise<string> {
-  const zip = await JSZip.loadAsync(buffer);
-  const doc = zip.file('word/document.xml');
+function extractDocxText(buffer: Buffer): string {
+  const [doc] = readZipEntries(buffer, (n) => n === 'word/document.xml');
   if (!doc) throw new Error('Not a valid .docx file (word/document.xml missing)');
-  const xml = await doc.async('string');
+  const xml = doc.data.toString('utf-8');
   // Paragraph ends become newlines; then strip all remaining tags
   const text = xml
     .replace(/<w:p[ >][\s\S]*?<\/w:p>/g, (p) => p.replace(/<[^>]+>/g, '') + '\n')
@@ -95,17 +130,15 @@ async function extractDocxText(buffer: Buffer): Promise<string> {
   return decodeXmlEntities(text);
 }
 
-async function extractPptxText(buffer: Buffer): Promise<string> {
-  const zip = await JSZip.loadAsync(buffer);
-  const slideNames = Object.keys(zip.files)
-    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
-    .sort((a, b) => Number(a.match(/(\d+)/)?.[1] ?? 0) - Number(b.match(/(\d+)/)?.[1] ?? 0));
-  if (slideNames.length === 0) throw new Error('Not a valid .pptx file (no slides found)');
+function extractPptxText(buffer: Buffer): string {
+  const slides = readZipEntries(buffer, (n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => Number(a.name.match(/(\d+)/)?.[1] ?? 0) - Number(b.name.match(/(\d+)/)?.[1] ?? 0));
+  if (slides.length === 0) throw new Error('Not a valid .pptx file (no slides found)');
   const parts: string[] = [];
-  for (const name of slideNames) {
-    const xml = await zip.file(name)!.async('string');
+  for (const slide of slides) {
+    const xml = slide.data.toString('utf-8');
     const runs = [...xml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((m) => decodeXmlEntities(m[1]));
-    const slideNo = name.match(/(\d+)/)?.[1];
+    const slideNo = slide.name.match(/(\d+)/)?.[1];
     if (runs.length) parts.push(`[Slide ${slideNo}] ${runs.join(' · ')}`);
   }
   return parts.join('\n\n');
@@ -162,7 +195,7 @@ export async function parseFileBuffer(buffer: Buffer, filename: string, mimetype
   }
 
   if (ext === '.docx') {
-    const text = await extractDocxText(buffer);
+    const text = extractDocxText(buffer);
     if (!text.trim()) throw new Error('No text could be extracted from the .docx file');
     return textToDataset(text, source);
   }
@@ -172,7 +205,7 @@ export async function parseFileBuffer(buffer: Buffer, filename: string, mimetype
   }
 
   if (ext === '.pptx') {
-    const text = await extractPptxText(buffer);
+    const text = extractPptxText(buffer);
     if (!text.trim()) throw new Error('No text could be extracted from the .pptx file');
     return textToDataset(text, source);
   }
