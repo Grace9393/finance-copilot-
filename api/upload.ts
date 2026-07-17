@@ -4,6 +4,11 @@ import { parseFileBuffer } from '../server/src/ingest.js';
 export const config = { api: { bodyParser: false } };
 
 async function readBody(req: VercelRequest): Promise<Buffer> {
+  // Vercel's request helper may have consumed the stream already and exposed
+  // the raw body on req.body — prefer that when present.
+  const preRead = (req as { body?: unknown }).body;
+  if (Buffer.isBuffer(preRead) && preRead.length > 0) return preRead;
+  if (typeof preRead === 'string' && preRead.length > 0) return Buffer.from(preRead, 'latin1');
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));

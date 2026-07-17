@@ -24,6 +24,9 @@ import path from "node:path";
 var config = { api: { bodyParser: false } };
 var execFileAsync = promisify(execFile);
 async function readBody(req) {
+  const preRead = req.body;
+  if (Buffer.isBuffer(preRead) && preRead.length > 0) return preRead;
+  if (typeof preRead === "string" && preRead.length > 0) return Buffer.from(preRead, "latin1");
   return new Promise((resolve, reject) => {
     const chunks = [];
     req.on("data", (chunk) => chunks.push(chunk));
