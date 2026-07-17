@@ -58,6 +58,55 @@ The dashboard reads **only** from the internal EPM dataset — no internet calls
 
 Set the MCP endpoint before starting the server (see `server/src/contextStudio.ts` / `server/context-studio.json`). Without it, enquiry, report fetch and web search still work; only the Context Studio modes report offline.
 
+### ICA MCP configuration
+
+The embedded chat can connect to an **IBM Consulting Advantage (ICA) MCP server** running locally. This gives access to ICA assistants, agents, digital workers and raw chat models directly from the Finance Studio chat panel.
+
+#### 1. Start the ICA MCP server
+
+```powershell
+cd "H:\My Drive\AA\mcp-ica-2.0-server-main"
+# Copy the example env file and add your ICA API key
+copy .env.example .env.local
+# Edit .env.local — set ICA_API_KEY=sk-...
+# Then start the HTTP server (defaults to port 3000)
+npm install
+npm run build
+npm run start:http
+```
+
+Verify it is running: `GET http://localhost:3000/health` should return `{"status":"ok"}`.
+
+#### 2. Configure Finance Studio
+
+Add these two lines to the Finance Studio root `.env.local`:
+
+```
+ICA_MCP_URL=http://localhost:3000
+ICA_API_KEY=sk-your-ica-key-here
+```
+
+Then (re)start Finance Studio with `npm run dev`.
+
+#### 3. Use ICA in the chat panel
+
+1. Open the **Section 2 – Enquiry** chat panel.
+2. Click the **ICA** button in the chat header — it turns green when the server is reachable.
+3. Select the **Namespace** (Assistant / Agent / Digital Worker / Raw Model).
+4. Paste the **Model / Assistant / Agent ID** from the ICA UI (_Settings → API Keys → find the ID in the relevant list_).
+5. Type your message and press **Send** (or Enter).
+
+Replies appear in the shared message thread, tagged with `ICA · <tool> · <model-id> · <ms>` metadata.
+
+#### API endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/chat/ica/status` | GET | Checks whether the ICA MCP server is reachable and returns available tools |
+| `POST /api/chat/ica` | POST | `{ message, tool, model, files? }` → `{ reply, tool, model, isError, elapsedMs }` |
+
+The `tool` field is one of: `ica_chat_assistants`, `ica_chat_agents`, `ica_chat_digital_workforce`, `ica_chat_models`.
+
 ## Legacy API
 
 `POST /api/analyse` (source-connector pipeline: local file, web URL, Google Sheets, ICA MCP) and `POST /api/upload` are retained from the v1 POC and still work — the chat file-upload zone uses `/api/upload`.

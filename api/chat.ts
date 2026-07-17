@@ -1,6 +1,7 @@
 // v2 — skill-aware routing: skills/@context/data/vector/graph → Context Studio; web-search is last-resort fallback
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
+import { detectDirective } from '../server/src/dashboardDirective.js';
 import { answerFromDataContext } from '../server/src/dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
 import { detectReportIntent, searchAnnualReport } from '../server/src/reportSearch.js';
@@ -78,13 +79,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Force Context Studio when: explicit mode, @context prefix, data is loaded, or a skill is invoked.
   const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
 
+  // Dashboard-control directive: chat questions steer the dashboard live.
+  const dashboardDirective = needsMessage
+    ? detectDirective(trimmedMessage, hasDataContext ? dataContext : undefined)
+    : undefined;
+
   // Data-grounded answering: with a data source connected, plain hybrid
   // questions are answered from the data itself (Context Studio retrieval
   // cannot read ad-hoc uploads). @context / vector / graph / skills still go
   // to Context Studio.
   if (needsMessage && hasDataContext && chatMode === 'hybrid' && !isContextPrefix && !isSkill) {
     try {
-      res.json({ reply: answerFromDataContext(trimmedMessage, dataContext!), tool: 'data-grounded', mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+      res.json({ reply: answerFromDataContext(trimmedMessage, dataContext!), dashboard: dashboardDirective, tool: 'data-grounded', mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Data-grounded answer failed', tool: 'data-grounded', mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -97,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (enquiryKind) {
     try {
       const answer = await answerEnquiry(trimmedMessage, enquiryKind);
-      res.json({ reply: answer.reply, tool: answer.tool, mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+      res.json({ reply: answer.reply, dashboard: dashboardDirective, tool: answer.tool, mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Finance enquiry failed', tool: 'finance-enquiry', mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -124,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? `_Ask me to summarize financials, compare with another company, or analyse specific sections._`
           : `_Try asking again or specify the company's investor relations page URL._`
       ].join('\n');
-      res.json({ reply: lines, tool: 'report-search', mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: 'report-search', mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Report search failed', tool: 'report-search', mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -145,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { tool, args } = buildToolCall(chatMode, groundedMessage);
     try {
       const result = await callTool(tool, args);
-      res.json({ reply: extractText(result), tool, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? undefined });
+      res.json({ reply: extractText(result), dashboard: dashboardDirective, tool, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? undefined });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Context Studio request failed', tool, mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -170,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `**Source:** [${result.url}](${result.url})`, '',
         `_Ask me follow-up questions or request a comparison with company financials._`
       ].filter(Boolean).join('\n');
-      res.json({ reply: lines, tool: 'web-search', mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: 'web-search', mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Web search failed', tool: 'web-search', mode: chatMode, elapsedMs: Date.now() - startedAt });
     }

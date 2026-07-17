@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import './App.css';
-import { DataContext, FinanceDataset } from './api';
+import { DashboardDirective, DataContext, FinanceDataset } from './api';
 import { ChatPanel, ChatSuggestion } from './components/ChatPanel';
-import { DashboardSection } from './components/DashboardSection';
-import { DataSourceBar, DatasetPreview } from './components/DataSourceBar';
+import { DEFAULT_EPM_FILTERS, DashboardSection, EpmFilters } from './components/DashboardSection';
+import { DataSourceBar } from './components/DataSourceBar';
+import { DynamicDashboard } from './components/DynamicDashboard';
 
 /**
  * Finance Studio — single-page POC:
@@ -46,8 +47,27 @@ const SUGGESTIONS: ChatSuggestion[] = [
 
 export default function App() {
   // External data source (upload / local path / web URL / Google Sheet) —
-  // shared by the dashboard (preview) and the chat (grounding context).
+  // drives the dynamic dashboard and grounds the chat.
   const [externalData, setExternalData] = useState<FinanceDataset | null>(null);
+  // Section-1 EPM dashboard filters — settable from the filter bar OR from chat
+  const [epmFilters, setEpmFilters] = useState<EpmFilters>(DEFAULT_EPM_FILTERS);
+  // Dynamic-dashboard steering from chat ("revenue by region")
+  const [dynDirective, setDynDirective] = useState<DashboardDirective>({});
+
+  // Chat replies carry dashboard directives — apply them live
+  const handleDirective = (d: DashboardDirective) => {
+    if (d.year !== undefined || d.geo || d.country || d.segment) {
+      setEpmFilters((prev) => ({
+        year: d.year ?? prev.year,
+        geo: d.geo ?? prev.geo,
+        country: d.country ?? (d.geo ? 'All' : prev.country),
+        segment: d.segment ?? prev.segment
+      }));
+    }
+    if (d.dimension || d.measure) {
+      setDynDirective((prev) => ({ ...prev, dimension: d.dimension ?? prev.dimension, measure: d.measure ?? prev.measure }));
+    }
+  };
 
   const externalContext: DataContext | undefined = useMemo(() => {
     if (!externalData?.rows?.length) return undefined;
@@ -86,13 +106,25 @@ export default function App() {
               onClear={() => setExternalData(null)}
             />
           </div>
-          {externalData && <DatasetPreview dataset={externalData} onClear={() => setExternalData(null)} />}
-          <DashboardSection />
+          {externalData && (
+            <DynamicDashboard
+              dataset={externalData}
+              directive={dynDirective}
+              onClear={() => { setExternalData(null); setDynDirective({}); }}
+            />
+          )}
+          <DashboardSection filters={epmFilters} onFiltersChange={setEpmFilters} />
         </div>
 
         {/* Right: Section 2 — free-text enquiry chat (grounded on any
-            connected external source) */}
-        <ChatPanel welcomeText={WELCOME} suggestions={SUGGESTIONS} dataContext={externalContext} showSourceBar />
+            connected external source; replies steer both dashboards) */}
+        <ChatPanel
+          welcomeText={WELCOME}
+          suggestions={SUGGESTIONS}
+          dataContext={externalContext}
+          showSourceBar
+          onDashboardDirective={handleDirective}
+        />
       </div>
     </div>
   );

@@ -5390,145 +5390,6 @@ ${p.text}`;
   return sections.join("\n\n---\n\n");
 }
 
-// server/src/dataAnswer.ts
-var STOPWORDS = /* @__PURE__ */ new Set([
-  "the",
-  "a",
-  "an",
-  "and",
-  "or",
-  "of",
-  "in",
-  "on",
-  "for",
-  "to",
-  "is",
-  "are",
-  "was",
-  "were",
-  "what",
-  "which",
-  "who",
-  "how",
-  "why",
-  "when",
-  "where",
-  "this",
-  "that",
-  "these",
-  "those",
-  "data",
-  "file",
-  "about",
-  "me",
-  "my",
-  "our",
-  "your",
-  "their",
-  "its",
-  "with",
-  "from",
-  "by",
-  "summarize",
-  "summarise",
-  "summary",
-  "show",
-  "tell",
-  "give",
-  "list",
-  "please",
-  "can",
-  "you",
-  "much",
-  "many",
-  "does",
-  "did",
-  "has",
-  "have",
-  "had",
-  "per",
-  "total",
-  "overall",
-  "it"
-]);
-function queryTerms(message) {
-  return [...new Set(
-    message.toLowerCase().split(/[^\p{L}\p{N}%.]+/u).map((t2) => t2.trim()).filter((t2) => t2.length > 2 && !STOPWORDS.has(t2))
-  )];
-}
-function isTextDataset(ctx) {
-  return ctx.fields.includes("text") && ctx.fields.length <= 3;
-}
-function tableJson(rows) {
-  return "```json\n" + JSON.stringify(rows, null, 1) + "\n```";
-}
-function answerFromText(message, ctx) {
-  const terms = queryTerms(message);
-  const scored = ctx.rows.map((row) => {
-    const text = String(row.text ?? "");
-    const lower2 = text.toLowerCase();
-    const score = terms.reduce((n, term) => n + (lower2.includes(term) ? 1 : 0), 0);
-    return { row, text, score };
-  }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
-  const lines = [`## From ${ctx.source}`, ""];
-  if (scored.length > 0) {
-    lines.push(`**Most relevant passages** (matched: ${terms.slice(0, 8).join(", ")}):`, "");
-    for (const entry of scored) {
-      lines.push(`> ${entry.text.length > 600 ? entry.text.slice(0, 600) + "\u2026" : entry.text}`, "");
-    }
-  } else {
-    lines.push("**No passage matched the question directly \u2014 document opening:**", "");
-    for (const row of ctx.rows.slice(0, 5)) {
-      lines.push(`> ${String(row.text ?? "").slice(0, 400)}`, "");
-    }
-  }
-  lines.push(`_Source: ${ctx.source} (${ctx.rows.length} passages loaded). Prefix with **@context** to query the Context Studio knowledge base instead._`);
-  return lines.join("\n");
-}
-function numericFields(ctx) {
-  return ctx.fields.filter(
-    (field) => ctx.rows.length > 0 && ctx.rows.every((row) => row[field] === "" || typeof row[field] === "number")
-  );
-}
-function answerFromTable(message, ctx) {
-  const terms = queryTerms(message);
-  const lines = [`## From ${ctx.source}`, ""];
-  const matches = terms.length > 0 ? ctx.rows.filter((row) => terms.some((term) => Object.values(row).some((v) => String(v).toLowerCase().includes(term)))) : [];
-  if (matches.length > 0 && matches.length < ctx.rows.length) {
-    lines.push(`**Rows matching ${terms.slice(0, 6).join(", ")}** (${matches.length} of ${ctx.rows.length}):`, "");
-    lines.push(tableJson(matches.slice(0, 15)));
-    lines.push("");
-  }
-  const numerics = numericFields(ctx).slice(0, 8);
-  if (numerics.length > 0) {
-    const statsRows = numerics.map((field) => {
-      const values = ctx.rows.map((row) => Number(row[field])).filter((v) => Number.isFinite(v));
-      const sum = values.reduce((a, b) => a + b, 0);
-      return {
-        Field: field,
-        Rows: values.length,
-        Total: Math.round(sum * 100) / 100,
-        Average: values.length ? Math.round(sum / values.length * 100) / 100 : 0,
-        Min: values.length ? Math.min(...values) : 0,
-        Max: values.length ? Math.max(...values) : 0
-      };
-    });
-    lines.push("**Numeric summary:**", "");
-    lines.push(tableJson(statsRows));
-    lines.push("");
-  }
-  if (matches.length === 0) {
-    lines.push(`**Preview** (first ${Math.min(10, ctx.rows.length)} of ${ctx.rows.length} rows \xB7 fields: ${ctx.fields.join(", ")}):`, "");
-    lines.push(tableJson(ctx.rows.slice(0, 10)));
-    lines.push("");
-  }
-  lines.push(`_Answered from the connected data source (${ctx.rows.length} rows). Prefix with **@context** to query the Context Studio knowledge base instead._`);
-  return lines.join("\n");
-}
-function answerFromDataContext(message, ctx) {
-  return isTextDataset(ctx) ? answerFromText(message, ctx) : answerFromTable(message, ctx);
-}
-
 // server/src/data/ibmAnnualReports.ts
 var ibmAnnualReports = {
   "company": "IBM",
@@ -5867,6 +5728,211 @@ function fmtMillions(value) {
   const abs = Math.abs(value);
   if (abs >= 1e3) return `$${(value / 1e3).toFixed(1)}B`;
   return `$${value.toFixed(0)}M`;
+}
+
+// server/src/dashboardDirective.ts
+var norm = (s2) => s2.toLowerCase().replace(/[^a-z0-9]/g, "");
+function detectEpmDirective(message) {
+  const ds = getDataset();
+  const m2 = message.toLowerCase();
+  const out = {};
+  const yearMatch = message.match(/\b(20\d{2})\b/);
+  if (yearMatch && ds.fiscalYears.includes(Number(yearMatch[1]))) out.year = Number(yearMatch[1]);
+  for (const geo of [...new Set(ds.geographies.map((g) => g.geo))]) {
+    if (m2.includes(geo.toLowerCase()) || geo === "Asia Pacific" && /\bapac\b/.test(m2)) {
+      out.geo = geo;
+      break;
+    }
+  }
+  for (const [geoName, shares] of Object.entries(ds.countryShares)) {
+    if (!shares || typeof shares === "string") continue;
+    for (const country of Object.keys(shares)) {
+      if (country.startsWith("Other")) continue;
+      if (m2.includes(country.toLowerCase())) {
+        out.country = country;
+        out.geo = geoName;
+        break;
+      }
+    }
+    if (out.country) break;
+  }
+  for (const seg of [...new Set(ds.segments.map((s2) => s2.segment))]) {
+    if (seg !== "Other" && m2.includes(seg.toLowerCase())) {
+      out.segment = seg;
+      break;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+function detectDataDirective(message, ctx) {
+  if (!ctx.rows?.length || ctx.fields.includes("text")) return null;
+  const m2 = norm(message);
+  const out = {};
+  const numeric = ctx.fields.filter((f3) => ctx.rows.every((row) => row[f3] === "" || typeof row[f3] === "number"));
+  const categorical = ctx.fields.filter((f3) => !numeric.includes(f3));
+  const byMatch = message.toLowerCase().match(/\bby\s+([\w /-]{2,30})/);
+  const byTerm = byMatch ? norm(byMatch[1]) : "";
+  for (const f3 of categorical) {
+    const nf = norm(f3);
+    if (nf.length < 3) continue;
+    if (byTerm && (byTerm.startsWith(nf) || nf.startsWith(byTerm)) || m2.includes(nf)) {
+      out.dimension = f3;
+      break;
+    }
+  }
+  for (const f3 of numeric) {
+    const nf = norm(f3);
+    if (nf.length >= 3 && m2.includes(nf)) {
+      out.measure = f3;
+      break;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+function detectDirective(message, ctx) {
+  const dataDirective = ctx ? detectDataDirective(message, ctx) : null;
+  const epmDirective = detectEpmDirective(message);
+  if (!dataDirective && !epmDirective) return void 0;
+  return { ...epmDirective ?? {}, ...dataDirective ?? {} };
+}
+
+// server/src/dataAnswer.ts
+var STOPWORDS = /* @__PURE__ */ new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "in",
+  "on",
+  "for",
+  "to",
+  "is",
+  "are",
+  "was",
+  "were",
+  "what",
+  "which",
+  "who",
+  "how",
+  "why",
+  "when",
+  "where",
+  "this",
+  "that",
+  "these",
+  "those",
+  "data",
+  "file",
+  "about",
+  "me",
+  "my",
+  "our",
+  "your",
+  "their",
+  "its",
+  "with",
+  "from",
+  "by",
+  "summarize",
+  "summarise",
+  "summary",
+  "show",
+  "tell",
+  "give",
+  "list",
+  "please",
+  "can",
+  "you",
+  "much",
+  "many",
+  "does",
+  "did",
+  "has",
+  "have",
+  "had",
+  "per",
+  "total",
+  "overall",
+  "it"
+]);
+function queryTerms(message) {
+  return [...new Set(
+    message.toLowerCase().split(/[^\p{L}\p{N}%.]+/u).map((t2) => t2.trim()).filter((t2) => t2.length > 2 && !STOPWORDS.has(t2))
+  )];
+}
+function isTextDataset(ctx) {
+  return ctx.fields.includes("text") && ctx.fields.length <= 3;
+}
+function tableJson(rows) {
+  return "```json\n" + JSON.stringify(rows, null, 1) + "\n```";
+}
+function answerFromText(message, ctx) {
+  const terms = queryTerms(message);
+  const scored = ctx.rows.map((row) => {
+    const text = String(row.text ?? "");
+    const lower2 = text.toLowerCase();
+    const score = terms.reduce((n, term) => n + (lower2.includes(term) ? 1 : 0), 0);
+    return { row, text, score };
+  }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+  const lines = [`## From ${ctx.source}`, ""];
+  if (scored.length > 0) {
+    lines.push(`**Most relevant passages** (matched: ${terms.slice(0, 8).join(", ")}):`, "");
+    for (const entry of scored) {
+      lines.push(`> ${entry.text.length > 600 ? entry.text.slice(0, 600) + "\u2026" : entry.text}`, "");
+    }
+  } else {
+    lines.push("**No passage matched the question directly \u2014 document opening:**", "");
+    for (const row of ctx.rows.slice(0, 5)) {
+      lines.push(`> ${String(row.text ?? "").slice(0, 400)}`, "");
+    }
+  }
+  lines.push(`_Source: ${ctx.source} (${ctx.rows.length} passages loaded). Prefix with **@context** to query the Context Studio knowledge base instead._`);
+  return lines.join("\n");
+}
+function numericFields(ctx) {
+  return ctx.fields.filter(
+    (field) => ctx.rows.length > 0 && ctx.rows.every((row) => row[field] === "" || typeof row[field] === "number")
+  );
+}
+function answerFromTable(message, ctx) {
+  const terms = queryTerms(message);
+  const lines = [`## From ${ctx.source}`, ""];
+  const matches = terms.length > 0 ? ctx.rows.filter((row) => terms.some((term) => Object.values(row).some((v) => String(v).toLowerCase().includes(term)))) : [];
+  if (matches.length > 0 && matches.length < ctx.rows.length) {
+    lines.push(`**Rows matching ${terms.slice(0, 6).join(", ")}** (${matches.length} of ${ctx.rows.length}):`, "");
+    lines.push(tableJson(matches.slice(0, 15)));
+    lines.push("");
+  }
+  const numerics = numericFields(ctx).slice(0, 8);
+  if (numerics.length > 0) {
+    const statsRows = numerics.map((field) => {
+      const values = ctx.rows.map((row) => Number(row[field])).filter((v) => Number.isFinite(v));
+      const sum = values.reduce((a, b) => a + b, 0);
+      return {
+        Field: field,
+        Rows: values.length,
+        Total: Math.round(sum * 100) / 100,
+        Average: values.length ? Math.round(sum / values.length * 100) / 100 : 0,
+        Min: values.length ? Math.min(...values) : 0,
+        Max: values.length ? Math.max(...values) : 0
+      };
+    });
+    lines.push("**Numeric summary:**", "");
+    lines.push(tableJson(statsRows));
+    lines.push("");
+  }
+  if (matches.length === 0) {
+    lines.push(`**Preview** (first ${Math.min(10, ctx.rows.length)} of ${ctx.rows.length} rows \xB7 fields: ${ctx.fields.join(", ")}):`, "");
+    lines.push(tableJson(ctx.rows.slice(0, 10)));
+    lines.push("");
+  }
+  lines.push(`_Answered from the connected data source (${ctx.rows.length} rows). Prefix with **@context** to query the Context Studio knowledge base instead._`);
+  return lines.join("\n");
+}
+function answerFromDataContext(message, ctx) {
+  return isTextDataset(ctx) ? answerFromText(message, ctx) : answerFromTable(message, ctx);
 }
 
 // node_modules/node-fetch/src/index.js
@@ -35263,7 +35329,7 @@ var SignatureExtractor = class {
         const ij = i2 * width + j;
         const center = buf[ij];
         let sum = 0;
-        let norm = 0;
+        let norm2 = 0;
         for (let k = 0; k < kernelSize; k++) {
           const y = i2 + k - halfSize;
           if (y < 0 || y >= height) {
@@ -35277,10 +35343,10 @@ var SignatureExtractor = class {
             const neighbour = buf[y * width + x2];
             const w = kernel[k * kernelSize + l] * rangeValues[Math.abs(neighbour - center)];
             sum += neighbour * w;
-            norm += w;
+            norm2 += w;
           }
         }
-        const pix = out[ij] = Math.round(sum / norm);
+        const pix = out[ij] = Math.round(sum / norm2);
         histogram[pix]++;
       }
     }
@@ -39704,9 +39770,10 @@ async function handler(req, res) {
   const detectedSkill = skillInvocation?.skill ?? null;
   const isSkill = detectedSkill !== null;
   const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
+  const dashboardDirective = needsMessage ? detectDirective(trimmedMessage, hasDataContext ? dataContext : void 0) : void 0;
   if (needsMessage && hasDataContext && chatMode === "hybrid" && !isContextPrefix && !isSkill) {
     try {
-      res.json({ reply: answerFromDataContext(trimmedMessage, dataContext), tool: "data-grounded", mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+      res.json({ reply: answerFromDataContext(trimmedMessage, dataContext), dashboard: dashboardDirective, tool: "data-grounded", mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Data-grounded answer failed", tool: "data-grounded", mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -39716,7 +39783,7 @@ async function handler(req, res) {
   if (enquiryKind) {
     try {
       const answer = await answerEnquiry(trimmedMessage, enquiryKind);
-      res.json({ reply: answer.reply, tool: answer.tool, mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
+      res.json({ reply: answer.reply, dashboard: dashboardDirective, tool: answer.tool, mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Finance enquiry failed", tool: "finance-enquiry", mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -39740,7 +39807,7 @@ async function handler(req, res) {
         "",
         result.fetched ? `_Ask me to summarize financials, compare with another company, or analyse specific sections._` : `_Try asking again or specify the company's investor relations page URL._`
       ].join("\n");
-      res.json({ reply: lines, tool: "report-search", mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: "report-search", mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Report search failed", tool: "report-search", mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -39757,7 +39824,7 @@ async function handler(req, res) {
     const { tool: tool2, args: args2 } = buildToolCall(chatMode, groundedMessage);
     try {
       const result = await callTool(tool2, args2);
-      res.json({ reply: extractText(result), tool: tool2, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? void 0 });
+      res.json({ reply: extractText(result), dashboard: dashboardDirective, tool: tool2, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? void 0 });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Context Studio request failed", tool: tool2, mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
@@ -39781,7 +39848,7 @@ ${s2.snippet}`), ""] : [];
         "",
         `_Ask me follow-up questions or request a comparison with company financials._`
       ].filter(Boolean).join("\n");
-      res.json({ reply: lines, tool: "web-search", mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: "web-search", mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Web search failed", tool: "web-search", mode: chatMode, elapsedMs: Date.now() - startedAt });
     }

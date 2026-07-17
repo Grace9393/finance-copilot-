@@ -79,12 +79,41 @@ export interface ChatStatus {
   error?: string;
 }
 
+/** Status returned by GET /api/chat/ica/status */
+export interface IcaChatStatus {
+  online: boolean;
+  url: string;
+  tools: string[];
+  error?: string;
+}
+
+/** Reply from POST /api/chat/ica */
+export interface IcaChatReply {
+  reply: string;
+  tool: string;
+  model: string;
+  isError: boolean;
+  elapsedMs: number;
+}
+
+/** Dashboard-control directive derived from a chat message. */
+export interface DashboardDirective {
+  year?: number;
+  geo?: string;
+  country?: string;
+  segment?: string;
+  dimension?: string;
+  measure?: string;
+}
+
 export interface ChatReply {
   reply: string;
   tool: string;
   mode: ChatMode;
   isError: boolean;
   elapsedMs: number;
+  /** When present, the client applies this to the dashboard view live */
+  dashboard?: DashboardDirective;
   reportUrl?: string;
   reportFullText?: string;
   /** Skill name when the reply was produced by a skill invocation via Context Studio */
@@ -127,6 +156,46 @@ export async function getChatStatus(): Promise<ChatStatus> {
   }
 
   return (await response.json()) as ChatStatus;
+}
+
+/** GET /api/chat/ica/status — check whether the ICA MCP server is reachable. */
+export async function getIcaChatStatus(): Promise<IcaChatStatus> {
+  const response = await fetch(`${API_BASE}/api/chat/ica/status`);
+  if (!response.ok) {
+    return { online: false, url: '', tools: [], error: 'Status request failed' };
+  }
+  return (await response.json()) as IcaChatStatus;
+}
+
+/**
+ * POST /api/chat/ica — send a message to an ICA assistant, agent, or model.
+ * @param message   The user's message.
+ * @param tool      ICA MCP tool name (default: 'ica_chat_assistants').
+ * @param model     The assistant/agent/model ID (required by ICA).
+ * @param files     Optional file or collection attachments.
+ */
+export async function sendIcaMessage(
+  message: string,
+  tool: string,
+  model: string,
+  files?: Array<{ type: string; id: string }>
+): Promise<IcaChatReply> {
+  const response = await fetch(`${API_BASE}/api/chat/ica`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, tool, model, files })
+  });
+
+  if (!response.ok) {
+    let errorMsg = 'ICA chat request failed';
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) errorMsg = body.error;
+    } catch { /* ignore */ }
+    throw new Error(errorMsg);
+  }
+
+  return (await response.json()) as IcaChatReply;
 }
 
 export async function sendChatMessage(

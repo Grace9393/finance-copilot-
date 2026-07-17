@@ -7,8 +7,19 @@ import { BarChart, TrendChart } from './charts';
  *
  * Data source: internal finance systems / EPM only (the ingested IBM
  * FY2023–FY2025 annual-report dataset served by /api/dashboard). The key
- * elements are configurable: Year, Geography, Country, Business Segment.
+ * elements are configurable: Year, Geography, Country, Business Segment —
+ * set via the filter bar OR steered live by chat directives (App owns the
+ * filter state).
  */
+
+export interface EpmFilters {
+  year: number;
+  geo: string;
+  country: string;
+  segment: string;
+}
+
+export const DEFAULT_EPM_FILTERS: EpmFilters = { year: 2025, geo: 'All', country: 'All', segment: 'All' };
 
 function KpiStrip({ kpis }: { kpis: DashboardPackage['kpis'] }) {
   return (
@@ -53,23 +64,26 @@ function PnlTable({ pnl }: { pnl: DashboardPackage['pnl'] }) {
   );
 }
 
-export function DashboardSection() {
+export function DashboardSection({ filters, onFiltersChange }: { filters: EpmFilters; onFiltersChange: (f: EpmFilters) => void }) {
   const [options, setOptions] = useState<FilterOptions | null>(null);
-  const [year, setYear] = useState<number>(2025);
-  const [geo, setGeo] = useState('All');
-  const [country, setCountry] = useState('All');
-  const [segment, setSegment] = useState('All');
+  // Filters may be controlled from outside (chat directives) via props
+  const year = filters.year;
+  const geo = filters.geo;
+  const country = filters.country;
+  const segment = filters.segment;
+  const setYear = (y: number) => onFiltersChange({ ...filters, year: y });
+  const setGeo = (g: string) => onFiltersChange({ ...filters, geo: g, country: 'All' });
+  const setCountry = (c: string) => onFiltersChange({ ...filters, country: c });
+  const setSegment = (s: string) => onFiltersChange({ ...filters, segment: s });
   const [data, setData] = useState<DashboardPackage | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchFilterOptions()
-      .then((opts) => {
-        setOptions(opts);
-        setYear(Math.max(...opts.years));
-      })
+      .then(setOptions)
       .catch(() => setError('Could not load filter options — is the server running?'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -99,7 +113,7 @@ export function DashboardSection() {
           </label>
           <label className="filter-field">
             <span>Geography</span>
-            <select value={geo} onChange={(e) => { setGeo(e.target.value); setCountry('All'); }}>
+            <select value={geo} onChange={(e) => setGeo(e.target.value)}>
               <option value="All">All geographies</option>
               {(options?.geographies ?? []).map((g) => <option key={g} value={g}>{g}</option>)}
             </select>

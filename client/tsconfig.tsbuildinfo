@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/components/chatpanel.tsx","./src/components/dashboardsection.tsx","./src/components/datasourcebar.tsx","./src/components/charts.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/components/chatpanel.tsx","./src/components/dashboardsection.tsx","./src/components/datasourcebar.tsx","./src/components/dynamicdashboard.tsx","./src/components/charts.tsx"],"version":"5.9.3"}

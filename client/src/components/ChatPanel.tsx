@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChatMode, ChatReply, DataContext, FinanceDataset, PptxReply, convertToPptx, getChatStatus, sendChatMessage, uploadFile } from '../api';
+import { ChatMode, ChatReply, DashboardDirective, DataContext, FinanceDataset, IcaChatStatus, PptxReply, convertToPptx, getChatStatus, getIcaChatStatus, sendChatMessage, sendIcaMessage, uploadFile } from '../api';
 import { DataSourceBar, UPLOAD_ACCEPT } from './DataSourceBar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -414,6 +414,14 @@ export interface ChatSuggestion {
   prompt: string;
 }
 
+// ── ICA Namespace options ─────────────────────────────────────────────────────
+const ICA_TOOL_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Assistant', value: 'ica_chat_assistants' },
+  { label: 'Agent',     value: 'ica_chat_agents' },
+  { label: 'Digital Worker', value: 'ica_chat_digital_workforce' },
+  { label: 'Raw Model', value: 'ica_chat_models' }
+];
+
 interface ChatPanelProps {
   dataContext?: DataContext;
   onDataContextChange?: (ctx: DataContext) => void;
@@ -423,12 +431,14 @@ interface ChatPanelProps {
   suggestions?: ChatSuggestion[];
   /** Show the data-source connect buttons (upload / local path / web URL / Google Sheet) */
   showSourceBar?: boolean;
+  /** Called when a reply carries a dashboard-control directive (chat steers the dashboard) */
+  onDashboardDirective?: (directive: DashboardDirective) => void;
 }
 
 const DEFAULT_WELCOME =
   'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.';
 
-export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions, showSourceBar }: ChatPanelProps) {
+export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions, showSourceBar, onDashboardDirective }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: nextId(),
@@ -447,11 +457,21 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
   const [uploadedDataset, setUploadedDataset] = useState<FinanceDataset | null>(null);
   // Full text from a fetched annual report — used to ground follow-up queries
   const [reportContext, setReportContext] = useState<{ title: string; text: string; url: string } | null>(null);
+  // ICA MCP state
+  const [icaStatus, setIcaStatus] = useState<IcaChatStatus | null>(null);
+  const [icaSectionOpen, setIcaSectionOpen] = useState(false);
+  const [icaTool, setIcaTool] = useState('ica_chat_assistants');
+  const [icaModel, setIcaModel] = useState('');
+  const [icaInput, setIcaInput] = useState('');
+  const [icaLoading, setIcaLoading] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const icaInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     getChatStatus().then((s) => setOnline(s.online)).catch(() => setOnline(false));
+    getIcaChatStatus().then((s) => setIcaStatus(s)).catch(() => setIcaStatus({ online: false, url: '', tools: [], error: 'Could not reach ICA status endpoint' }));
   }, []);
 
   useEffect(() => {
@@ -564,6 +584,12 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
         : res.mode;
       const metaParts = [toolLabel, `${res.elapsedMs}ms`];
 
+      // Chat steers the dashboard: apply any directive carried by the reply
+      if (res.dashboard && onDashboardDirective && Object.keys(res.dashboard).length > 0) {
+        onDashboardDirective(res.dashboard);
+        metaParts.push('📊 dashboard updated');
+      }
+
       // Store report full text so follow-up questions are grounded on it
       if (res.reportFullText && res.reportUrl) {
         const titleMatch = res.reply.match(/^## (.+)/m);
@@ -600,6 +626,39 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  async function handleIcaSend() {
+    const text = icaInput.trim();
+    if (!text || !icaModel.trim() || icaLoading) return;
+
+    setMessages((prev) => [
+      ...prev,
+      { id: nextId(), role: 'user', text: `[ICA · ${ICA_TOOL_OPTIONS.find(o => o.value === icaTool)?.label ?? icaTool}] ${text}` }
+    ]);
+    setIcaInput('');
+    setIcaLoading(true);
+
+    try {
+      const res = await sendIcaMessage(text, icaTool, icaModel.trim());
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nextId(),
+          role: res.isError ? 'error' : 'assistant',
+          text: res.reply,
+          meta: `ICA · ${res.tool} · ${icaModel.trim()} · ${res.elapsedMs}ms`
+        }
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId(), role: 'error', text: err instanceof Error ? err.message : 'ICA request failed' }
+      ]);
+    } finally {
+      setIcaLoading(false);
+      setTimeout(() => icaInputRef.current?.focus(), 50);
+    }
+  }
+
   const needsMessage = QUERY_MODES.includes(mode);
   const canSend = !loading && !uploading && (!needsMessage || input.trim().length > 0);
   const dotColor = online === null ? '#94a3b8' : online ? '#22c55e' : '#ef4444';
@@ -611,6 +670,8 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
       : effectiveContext
         ? `⬡ ${effectiveContext.source} · ${effectiveContext.rows.length} rows · ${effectiveContext.fields.length} fields`
         : null;
+
+  const icaDotColor = icaStatus === null ? '#94a3b8' : icaStatus.online ? '#22c55e' : '#ef4444';
 
   return (
     <div className="chat-panel">
@@ -627,6 +688,16 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
+            className={`skills-toggle-btn${icaSectionOpen ? ' active' : ''}`}
+            onClick={() => setIcaSectionOpen((o) => !o)}
+            type="button"
+            title={icaStatus?.online ? `ICA MCP connected — ${icaStatus.tools.length} tools` : (icaStatus?.error ?? 'ICA MCP offline')}
+            style={{ background: icaStatus?.online ? undefined : '#f3f4f6', color: icaStatus?.online ? undefined : '#9ca3af' }}
+          >
+            <span className="chat-online-dot" style={{ background: icaDotColor, marginRight: 5, verticalAlign: 'middle' }} />
+            ICA
+          </button>
+          <button
             className={`skills-toggle-btn${skillsOpen ? ' active' : ''}`}
             onClick={() => setSkillsOpen((o) => !o)}
             type="button"
@@ -641,6 +712,76 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
 
       {/* Skills drawer */}
       <SkillsDrawer open={skillsOpen} onUse={handleSkillUse} />
+
+      {/* ICA MCP section */}
+      {icaSectionOpen && (
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid #e5e7eb', background: '#f7f8fa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>IBM Consulting Advantage (ICA)</span>
+            <span style={{ fontSize: 12, color: icaStatus?.online ? '#22c55e' : '#ef4444' }}>
+              {icaStatus === null ? 'Checking…' : icaStatus.online ? `● Connected · ${icaStatus.tools.length} tools` : `● Offline${icaStatus.error ? ' — ' + icaStatus.error : ''}`}
+            </span>
+          </div>
+          {!icaStatus?.online && (
+            <div style={{ fontSize: 12, color: '#57606a', marginBottom: 8, lineHeight: 1.5 }}>
+              Start the ICA MCP server first:<br />
+              <code style={{ background: '#e5e7eb', padding: '1px 5px', borderRadius: 3 }}>cd "mcp-ica-2.0-server-main" &amp;&amp; npm run start:http</code><br />
+              Then set <code style={{ background: '#e5e7eb', padding: '1px 5px', borderRadius: 3 }}>ICA_MCP_URL=http://localhost:3000</code> and <code style={{ background: '#e5e7eb', padding: '1px 5px', borderRadius: 3 }}>ICA_API_KEY=sk-…</code> in <code style={{ background: '#e5e7eb', padding: '1px 5px', borderRadius: 3 }}>.env.local</code>.
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <label style={{ fontSize: 11, color: '#57606a' }}>Namespace</label>
+              <select
+                value={icaTool}
+                onChange={(e) => setIcaTool(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff' }}
+              >
+                {ICA_TOOL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 180 }}>
+              <label style={{ fontSize: 11, color: '#57606a' }}>
+                Model / Assistant / Agent ID
+                {icaStatus?.tools && icaStatus.tools.length > 0 && (
+                  <span style={{ marginLeft: 6, color: '#3b82d4' }}>
+                    (tools: {icaStatus.tools.slice(0, 3).join(', ')}{icaStatus.tools.length > 3 ? '…' : ''})
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={icaModel}
+                onChange={(e) => setIcaModel(e.target.value)}
+                placeholder="Paste the assistant/agent/model ID from ICA UI"
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', width: '100%' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <textarea
+              ref={icaInputRef}
+              rows={2}
+              value={icaInput}
+              onChange={(e) => setIcaInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleIcaSend(); } }}
+              placeholder="Type a message to send to ICA… (Enter to send)"
+              disabled={icaLoading || !icaStatus?.online}
+              style={{ flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', resize: 'none', fontFamily: 'inherit' }}
+            />
+            <button
+              type="button"
+              onClick={() => void handleIcaSend()}
+              disabled={icaLoading || !icaInput.trim() || !icaModel.trim() || !icaStatus?.online}
+              style={{ padding: '6px 18px', background: '#3b82d4', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer', fontSize: 13, height: 52, opacity: (icaLoading || !icaInput.trim() || !icaModel.trim() || !icaStatus?.online) ? 0.5 : 1 }}
+            >
+              {icaLoading ? '…' : 'Send'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mode selector */}
       <div className="chat-modes">

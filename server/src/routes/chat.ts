@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { callTool, extractText, getConfig, listTools } from '../contextStudio.js';
 import { answerFromDataContext } from '../dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../enquiry.js';
+import { detectDirective } from '../dashboardDirective.js';
+import { callIcaTool, extractIcaText, getIcaConfig, listIcaTools } from '../icaMcp.js';
 import { detectReportIntent, searchAnnualReport } from '../reportSearch.js';
 import { detectSkillInvocation } from '../skills.js';
 import { webSearch } from '../webSearch.js';
@@ -82,6 +84,96 @@ chatRouter.get('/status', async (_request, response) => {
   }
 });
 
+// ── ICA MCP status ────────────────────────────────────────────────────────────
+chatRouter.get('/ica/status', async (_request, response) => {
+  const config = getIcaConfig();
+
+  if (!config.url) {
+    response.json({
+      online: false,
+      url: '',
+      tools: [],
+      error: 'ICA_MCP_URL is not configured. Add it to .env.local.'
+    });
+    return;
+  }
+
+  try {
+    const tools = await listIcaTools();
+    response.json({
+      online: true,
+      url: config.url,
+      tools: tools.map((t) => t.name)
+    });
+  } catch (error) {
+    response.json({
+      online: false,
+      url: config.url,
+      tools: [],
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ── ICA MCP chat ──────────────────────────────────────────────────────────────
+// POST /api/chat/ica — send a message to an ICA assistant/agent/model via the
+// ICA MCP server. The tool name and model ID are specified in the request body.
+chatRouter.post('/ica', async (request, response) => {
+  const {
+    message,
+    tool = 'ica_chat_assistants',
+    model,
+    files
+  } = request.body as {
+    message?: string;
+    tool?: string;
+    model?: string;
+    files?: Array<{ type: string; id: string }>;
+  };
+
+  if (!message?.trim()) {
+    response.status(400).json({ error: 'message is required' });
+    return;
+  }
+  if (!model) {
+    response.status(400).json({ error: 'model (assistant/agent/model ID) is required' });
+    return;
+  }
+
+  const icaConfig = getIcaConfig();
+  if (!icaConfig.url) {
+    response.status(503).json({
+      error: 'ICA MCP is not configured. Set ICA_MCP_URL in .env.local and start the ICA MCP server.'
+    });
+    return;
+  }
+
+  const startedAt = Date.now();
+  const args: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: message.trim() }]
+  };
+  if (files?.length) args.files = files;
+
+  try {
+    const result = await callIcaTool(tool, args);
+    response.json({
+      reply: extractIcaText(result),
+      tool,
+      model,
+      isError: result.isError ?? false,
+      elapsedMs: Date.now() - startedAt
+    });
+  } catch (error) {
+    response.status(502).json({
+      error: error instanceof Error ? error.message : 'ICA MCP request failed',
+      tool,
+      model,
+      elapsedMs: Date.now() - startedAt
+    });
+  }
+});
+
 chatRouter.post('/', async (request, response) => {
   const { message, mode, dataContext } = request.body as {
     message?: string;
@@ -99,6 +191,34 @@ chatRouter.post('/', async (request, response) => {
   const trimmedMessage = message?.trim() ?? '';
   const startedAt = Date.now();
 
+  // ── ICA prefix — @ica <message> routes directly to ICA MCP ──────────────────
+  // Users prefix with "@ica " to explicitly send the query to ICA via the chat
+  // panel without having to use the dedicated ICA section.
+  const isIcaPrefixed = trimmedMessage.toLowerCase().startsWith('@ica ');
+  if (needsMessage && isIcaPrefixed) {
+    const icaConfig = getIcaConfig();
+
+    if (!icaConfig.url) {
+      response.status(503).json({
+        error: 'ICA MCP is not configured. Set ICA_MCP_URL in .env.local.',
+        tool: 'ica-mcp',
+        mode: chatMode,
+        elapsedMs: Date.now() - startedAt
+      });
+      return;
+    }
+
+    // Default to ica_chat_models; a model is required — without one we instruct
+    // the user to use the ICA section which shows available models.
+    response.status(400).json({
+      error: 'Use the ICA section in the chat panel to select an assistant/agent/model, then send your message, or provide a model ID.',
+      tool: 'ica-mcp',
+      mode: chatMode,
+      elapsedMs: Date.now() - startedAt
+    });
+    return;
+  }
+
   // ── Routing flags (parity with api/chat.ts skill-aware routing v2) ──────────
   // Skills ("@skill-name …", "Use the X skill …"), the @context prefix, loaded
   // data, and explicit vector/graph modes all force Context Studio MCP.
@@ -107,6 +227,13 @@ chatRouter.post('/', async (request, response) => {
   const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
   const skillInvocation = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
   const forceContextStudio = isExplicitCSMode || isContextPrefixed || hasDataContext || skillInvocation !== null;
+
+  // Dashboard-control directive: chat questions steer the dashboard live
+  // (year/geo/country/segment for the EPM view; dimension/measure for the
+  // dynamic view built from connected data).
+  const dashboardDirective = needsMessage
+    ? detectDirective(trimmedMessage, hasDataContext ? dataContext : undefined)
+    : undefined;
 
   // ── Data-grounded answering ──────────────────────────────────────────────────
   // With a data source connected (upload / local path / web URL / Google Sheet /
@@ -117,6 +244,7 @@ chatRouter.post('/', async (request, response) => {
     try {
       response.json({
         reply: answerFromDataContext(trimmedMessage, dataContext!),
+        dashboard: dashboardDirective,
         tool: 'data-grounded',
         mode: chatMode,
         isError: false,
@@ -145,6 +273,7 @@ chatRouter.post('/', async (request, response) => {
       const answer = await answerEnquiry(trimmedMessage, enquiryKind);
       response.json({
         reply: answer.reply,
+        dashboard: dashboardDirective,
         tool: answer.tool,
         mode: chatMode,
         isError: false,
@@ -198,6 +327,7 @@ chatRouter.post('/', async (request, response) => {
 
       response.json({
         reply: lines,
+        dashboard: dashboardDirective,
         tool: 'report-search',
         mode: chatMode,
         isError: !result.fetched,
@@ -256,6 +386,7 @@ chatRouter.post('/', async (request, response) => {
 
       response.json({
         reply: lines,
+        dashboard: dashboardDirective,
         tool: 'web-search',
         mode: chatMode,
         isError: !result.fetched,
@@ -297,6 +428,7 @@ chatRouter.post('/', async (request, response) => {
     const result = await callTool(tool, args);
     response.json({
       reply: extractText(result),
+      dashboard: dashboardDirective,
       tool,
       mode: chatMode,
       isError: result.isError ?? false,
