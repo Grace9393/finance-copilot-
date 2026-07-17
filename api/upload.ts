@@ -1,12 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// Force-include the runtime packages used by server/src/ingest.js — Vercel's
-// file tracer only bundles node_modules packages imported from api entry
-// files, not from the includeFiles-shipped server/src modules.
-import 'csv-parse/sync';
-import 'cheerio';
-import 'node-fetch';
-import 'xlsx';
-import 'pdf-parse';
 import { parseFileBuffer } from '../server/src/ingest.js';
 
 export const config = { api: { bodyParser: false } };

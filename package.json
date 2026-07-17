@@ -8,10 +8,12 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
-    "build": "npm run build --workspace server && npm run build --workspace client",
-    "start": "npm run start --workspace server"
+    "build": "npm run bundle:api && npm run build --workspace server && npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "bundle:api": "node scripts/bundle-api.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
+    "concurrently": "^9.0.1",
+    "esbuild": "^0.28.1"
   }
 }

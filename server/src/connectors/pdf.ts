@@ -4,16 +4,7 @@ import path from 'node:path';
 import fetch from 'node-fetch';
 import { Connector, FinanceDataset, FinanceRow, normaliseValue } from '../types.js';
 
-// Lazy-load pdf-parse to avoid import.meta issues in serverless environments
-let _pdfParse: ((buffer: Buffer) => Promise<{ text: string; numpages: number }>) | null = null;
-async function getPdfParse() {
-  if (!_pdfParse) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = await import('pdf-parse') as any;
-    _pdfParse = (mod.default ?? mod) as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
-  }
-  return _pdfParse;
-}
+import { pdfToText } from '../pdfText.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -121,8 +112,7 @@ export class PdfConnector implements Connector {
       throw new Error('filePath or url is required for pdf source');
     }
 
-    const pdfParse = await getPdfParse();
-    const parsed = await pdfParse(buffer);
+    const parsed = await pdfToText(buffer);
     const text = parsed.text ?? '';
 
     if (!text.trim()) {

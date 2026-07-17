@@ -7,24 +7,21 @@
       "config": { "distDir": "dist" }
     },
     {
-      "src": "api/*.ts",
+      "src": "api-dist/*.mjs",
       "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60,
-        "includeFiles": "server/src/**"
-      }
+      "config": { "maxDuration": 60, "includeFiles": "api-dist/pdf.worker.mjs" }
     }
   ],
   "routes": [
-    { "src": "/api/chat/status", "dest": "/api/chat.ts" },
-    { "src": "/api/dashboard/options", "dest": "/api/dashboard.ts" },
-    { "src": "/api/dashboard",   "dest": "/api/dashboard.ts" },
-    { "src": "/api/health",      "dest": "/api/health.ts" },
-    { "src": "/api/analyse",     "dest": "/api/analyse.ts" },
-    { "src": "/api/upload",      "dest": "/api/upload.ts" },
-    { "src": "/api/source",      "dest": "/api/source.ts" },
-    { "src": "/api/pptx",        "dest": "/api/pptx.ts" },
-    { "src": "/api/chat",        "dest": "/api/chat.ts" },
+    { "src": "/api/chat/status", "dest": "/api-dist/chat.mjs" },
+    { "src": "/api/dashboard/options", "dest": "/api-dist/dashboard.mjs" },
+    { "src": "/api/dashboard",   "dest": "/api-dist/dashboard.mjs" },
+    { "src": "/api/health",      "dest": "/api-dist/health.mjs" },
+    { "src": "/api/analyse",     "dest": "/api-dist/analyse.mjs" },
+    { "src": "/api/upload",      "dest": "/api-dist/upload.mjs" },
+    { "src": "/api/source",      "dest": "/api-dist/source.mjs" },
+    { "src": "/api/pptx",        "dest": "/api-dist/pptx.mjs" },
+    { "src": "/api/chat",        "dest": "/api-dist/chat.mjs" },
     { "src": "/(.*)",            "dest": "/client/$1" }
   ]
 }

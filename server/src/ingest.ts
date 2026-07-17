@@ -13,17 +13,13 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { inflateRawSync } from 'node:zlib';
 import { parse } from 'csv-parse/sync';
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import * as XLSX from 'xlsx';
+import { pdfToText } from './pdfText.js';
 import { FinanceDataset, FinanceRow, normaliseValue } from './types.js';
-
-const require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
 
 export type IngestedDataset = FinanceDataset & { imageDataUri?: string };
 
@@ -189,7 +185,7 @@ export async function parseFileBuffer(buffer: Buffer, filename: string, mimetype
   }
 
   if (ext === '.pdf' || mimetype === 'application/pdf') {
-    const parsed = await pdfParse(buffer);
+    const parsed = await pdfToText(buffer);
     if (!parsed.text?.trim()) throw new Error('PDF appears to be image-only (no extractable text).');
     return textToDataset(parsed.text, source);
   }
@@ -262,7 +258,7 @@ export async function ingestWebUrl(url: string): Promise<IngestedDataset> {
   const buffer = Buffer.from(await response.arrayBuffer());
 
   if (contentType.includes('pdf') || /\.pdf(\?|$)/i.test(url)) {
-    const parsed = await pdfParse(buffer);
+    const parsed = await pdfToText(buffer);
     return textToDataset(parsed.text, url);
   }
   if (contentType.includes('csv') || /\.csv(\?|$)/i.test(url)) {

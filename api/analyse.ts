@@ -94,9 +94,18 @@ function chunkTextToRows(text: string): FinanceRow[] {
 }
 
 async function getPdfParse(): Promise<(buf: Buffer) => Promise<{ text: string; numpages: number }>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import('pdf-parse') as any;
-  return (mod.default ?? mod) as (buf: Buffer) => Promise<{ text: string; numpages: number }>;
+  // pdf-parse v2 exposes a PDFParse class — wrap it in the v1-style callable
+  const mod = await import('pdf-parse');
+  return async (buf: Buffer) => {
+    const parser = new mod.PDFParse({ data: new Uint8Array(buf) });
+    try {
+      const result = await parser.getText();
+      const pages = Array.isArray((result as { pages?: unknown[] }).pages) ? (result as { pages: unknown[] }).pages.length : 0;
+      return { text: result.text ?? '', numpages: pages };
+    } finally {
+      await (parser as { destroy?: () => Promise<void> }).destroy?.();
+    }
+  };
 }
 
 async function fetchLocalFile(filePath: string): Promise<FinanceDataset> {
