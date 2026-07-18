@@ -39688,6 +39688,88 @@ async function searchAnnualReport(company, year) {
   };
 }
 
+// server/src/skillRunner.ts
+function formatWebResult(result) {
+  const snippetLines = result.snippets.slice(0, 5).map((s2, i2) => `**${i2 + 1}. [${s2.title}](${s2.url})**
+${s2.snippet}`);
+  const reply = [
+    `## \u{1F50D} ${result.title}`,
+    "",
+    ...snippetLines.length ? ["**Top results:**", "", ...snippetLines, ""] : [],
+    result.excerpt.slice(0, 2500),
+    "",
+    `**Source:** [${result.url}](${result.url})`
+  ].filter(Boolean).join("\n");
+  return { reply, tool: "web-search", isError: !result.fetched, reportUrl: result.url, reportFullText: result.fullText };
+}
+async function runSkill(invocation, dataContext) {
+  const query = invocation.query || invocation.message;
+  switch (invocation.route) {
+    case "web": {
+      const searchQuery = invocation.skill === "industry-search" && !/industry|market/i.test(query) ? `${query} industry market size outlook` : invocation.skill === "earnings-peer-comparison" && !/earnings|results|revenue/i.test(query) ? `${query} latest earnings results comparison` : query;
+      return formatWebResult(await webSearch(searchQuery));
+    }
+    case "report": {
+      const intent = detectReportIntent(query) ?? detectReportIntent(`${query} annual report`);
+      if (!intent) {
+        return formatWebResult(await webSearch(`${query} annual report`));
+      }
+      const result = await searchAnnualReport(intent.company, intent.year);
+      if (result.ingested) {
+        const ingested = result;
+        const config = getConfig();
+        if (config.url) {
+          const csResult = await callTool("context-broker-hybrid-query", {
+            context_id: config.contextId,
+            AgentPersona: config.agentPersona,
+            query: ingested.contextStudioQuery
+          });
+          return { reply: extractText(csResult), tool: "context-broker-hybrid-query", isError: csResult.isError ?? false };
+        }
+      }
+      const r2 = result;
+      const cleanExcerpt = r2.excerpt.replace(/\f/g, "\n\n").replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n").trim();
+      const reply = [
+        `## ${r2.title}`,
+        "",
+        r2.fetched ? `\u2705 Read **${r2.title}**${r2.pages > 0 ? ` \xB7 ${r2.pages} pages` : ""}:` : `\u{1F50D} Searched the web for **${r2.title}**:`,
+        "",
+        cleanExcerpt || "_(No content could be extracted)_",
+        "",
+        `**Source:** [${r2.url}](${r2.url})`
+      ].join("\n");
+      return { reply, tool: "report-search", isError: !r2.fetched, reportUrl: r2.url, reportFullText: r2.fullText };
+    }
+    case "enquiry": {
+      const kind = detectEnquiry(query) ?? "rootCause";
+      const answer = await answerEnquiry(query || invocation.message, kind);
+      return { reply: answer.reply, tool: answer.tool, isError: false };
+    }
+    case "data": {
+      if (dataContext?.rows?.length) {
+        return { reply: answerFromDataContext(query || "summarize this document", dataContext), tool: "data-grounded", isError: false };
+      }
+      return {
+        reply: `The **${invocation.skill}** skill reads a connected document or dataset \u2014 nothing is loaded yet.
+
+Upload a file (\u{1F4E4} Upload file) or connect a source first, then re-run:
+\`@${invocation.skill} ${query || "summarize the document"}\``,
+        tool: invocation.skill,
+        isError: true
+      };
+    }
+    case "pptx":
+      return {
+        reply: "The **file-to-pptx** skill converts an attached file into an editable, downloadable PowerPoint.\n\nDrop a file (image, PDF, Excel, CSV, MD\u2026) into the upload zone first, then run `@file-to-pptx` \u2014 the deck download button appears right here in the chat.",
+        tool: "file-to-pptx",
+        isError: true
+      };
+    case "context":
+    default:
+      return null;
+  }
+}
+
 // server/src/skills.ts
 var BOB_SKILL_NAMES = [
   "annual-report-analyzer",
@@ -39704,6 +39786,18 @@ var QUICK_ACTION_NAMES = [
   "industry-search"
 ];
 var SKILL_NAMES = [...BOB_SKILL_NAMES, ...QUICK_ACTION_NAMES];
+var SKILL_ROUTES = {
+  "annual-report-analyzer": "report",
+  "annual-report-search": "report",
+  "earnings-peer-comparison": "web",
+  "web-search": "web",
+  "industry-search": "web",
+  "web-document-search": "web",
+  "financial-variance-analysis": "enquiry",
+  "margin-lever-playbook": "enquiry",
+  "pdf-file-reader": "data",
+  "file-to-pptx": "pptx"
+};
 function detectSkillInvocation(raw) {
   const message = raw.trim();
   const lower2 = message.toLowerCase();
@@ -39716,15 +39810,32 @@ function detectSkillInvocation(raw) {
         const rest = message.slice(prefixMatch[0].length).trim();
         return {
           skill: match,
-          message: rest ? `Use the ${match} skill: ${rest}` : `Use the ${match} skill.`
+          route: SKILL_ROUTES[match] ?? "context",
+          message: rest ? `Use the ${match} skill: ${rest}` : `Use the ${match} skill.`,
+          query: rest
         };
       }
     }
   }
-  const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b/i);
-  if (genericMatch) return { skill: genericMatch[1].toLowerCase(), message };
+  const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b(?:\s*(?:to|for|on|:))?\s*/i);
+  if (genericMatch) {
+    const name = genericMatch[1].toLowerCase();
+    return {
+      skill: name,
+      route: SKILL_ROUTES[name] ?? "context",
+      message,
+      query: message.slice((genericMatch.index ?? 0) + genericMatch[0].length).trim()
+    };
+  }
   for (const name of SKILL_NAMES) {
-    if (lower2.includes(name)) return { skill: name, message };
+    if (lower2.includes(name)) {
+      return {
+        skill: name,
+        route: SKILL_ROUTES[name] ?? "context",
+        message,
+        query: message.replace(new RegExp(name, "ig"), "").replace(/\s{2,}/g, " ").trim()
+      };
+    }
   }
   return null;
 }
@@ -39793,8 +39904,20 @@ async function handler(req, res) {
   const skillInvocation = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
   const detectedSkill = skillInvocation?.skill ?? null;
   const isSkill = detectedSkill !== null;
-  const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
+  const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || skillInvocation?.route === "context";
   const dashboardDirective = needsMessage ? detectDirective(trimmedMessage, hasDataContext ? dataContext : void 0) : void 0;
+  if (skillInvocation && skillInvocation.route !== "context") {
+    try {
+      const result = await runSkill(skillInvocation, hasDataContext ? dataContext : void 0);
+      if (result) {
+        res.json({ ...result, dashboard: dashboardDirective, mode: chatMode, skill: skillInvocation.skill, elapsedMs: Date.now() - startedAt });
+        return;
+      }
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : `Skill ${skillInvocation.skill} failed`, tool: skillInvocation.skill, mode: chatMode, elapsedMs: Date.now() - startedAt });
+      return;
+    }
+  }
   if (needsMessage && hasDataContext && chatMode === "hybrid" && !isContextPrefix && !isSkill) {
     try {
       res.json({ reply: answerFromDataContext(trimmedMessage, dataContext), dashboard: dashboardDirective, tool: "data-grounded", mode: chatMode, isError: false, elapsedMs: Date.now() - startedAt });

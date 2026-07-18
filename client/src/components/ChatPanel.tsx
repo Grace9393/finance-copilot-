@@ -549,8 +549,33 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
     setInput('');
     setLoading(true);
 
-    // ── PPTX conversion intent: file is an image and message asks for PPTX ──
-    if (pendingFile && pendingFile.type.startsWith('image/') && isPptxIntent(text)) {
+    // ── PPTX conversion: explicit @file-to-pptx skill, or a compatible file
+    //    plus wording that asks for a PPTX. Runs fully client-side against
+    //    /api/pptx and renders a download button in the chat.
+    const isPptxSkill = /(^|\s)@?file-to-pptx\b/i.test(text) || /use\s+the\s+file-to-pptx\s+skill/i.test(text);
+    const pptxCapable = !!pendingFile &&
+      (pendingFile.type.startsWith('image/') || pendingFile.type === 'application/pdf' || /\.pdf$/i.test(pendingFile.name));
+
+    if (isPptxSkill && !pendingFile) {
+      setMessages((prev) => [...prev, {
+        id: nextId(), role: 'assistant',
+        text: 'The **file-to-pptx** skill converts an attached file into an editable, downloadable PowerPoint.\n\nDrop an image or PDF into the upload zone first, then run `@file-to-pptx` — the deck download button appears right here.'
+      }]);
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+      return;
+    }
+    if (isPptxSkill && pendingFile && !pptxCapable) {
+      setMessages((prev) => [...prev, {
+        id: nextId(), role: 'assistant',
+        text: `**file-to-pptx** currently converts images and PDFs — "${pendingFile.name}" is neither. Attach a PNG/JPG or PDF and re-run \`@file-to-pptx\`.`
+      }]);
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+      return;
+    }
+
+    if (pendingFile && pptxCapable && (isPptxSkill || isPptxIntent(text))) {
       try {
         const titleMatch = text.match(/title[:\s]+["']?([^"'\n]+)/i);
         const pptx = await convertToPptx(pendingFile, titleMatch ? titleMatch[1].trim() : undefined);
@@ -815,9 +840,9 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
           <DataSourceBar
             compact
             connectedSource={uploadedDataset?.source ?? null}
+            onFileSelected={setPendingFile}
             onConnect={(dataset) => {
               setUploadedDataset(dataset);
-              setPendingFile(null);
               setMessages((prev) => [
                 ...prev,
                 {

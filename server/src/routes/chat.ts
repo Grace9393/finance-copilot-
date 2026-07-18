@@ -4,7 +4,8 @@ import { answerFromDataContext } from '../dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../enquiry.js';
 import { detectDirective } from '../dashboardDirective.js';
 import { callIcaTool, extractIcaText, getIcaConfig, listIcaTools } from '../icaMcp.js';
-import { detectReportIntent, searchAnnualReport } from '../reportSearch.js';
+import { detectReportIntent, searchAnnualReport, type ReportAlreadyIngested, type ReportSearchResult } from '../reportSearch.js';
+import { runSkill } from '../skillRunner.js';
 import { detectSkillInvocation } from '../skills.js';
 import { webSearch } from '../webSearch.js';
 
@@ -226,7 +227,9 @@ chatRouter.post('/', async (request, response) => {
   const isExplicitCSMode = chatMode === 'vector' || chatMode === 'graph';
   const isContextPrefixed = trimmedMessage.toLowerCase().startsWith('@context');
   const skillInvocation = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
-  const forceContextStudio = isExplicitCSMode || isContextPrefixed || hasDataContext || skillInvocation !== null;
+  // Only Context-Studio-routed skills force the MCP path — skills with real
+  // local implementations (web / report / enquiry / data / pptx) execute below.
+  const forceContextStudio = isExplicitCSMode || isContextPrefixed || hasDataContext || skillInvocation?.route === 'context';
 
   // Dashboard-control directive: chat questions steer the dashboard live
   // (year/geo/country/segment for the EPM view; dimension/measure for the
@@ -234,6 +237,33 @@ chatRouter.post('/', async (request, response) => {
   const dashboardDirective = needsMessage
     ? detectDirective(trimmedMessage, hasDataContext ? dataContext : undefined)
     : undefined;
+
+  // ── Skill execution on real implementations ──────────────────────────────────
+  // web-search / report / enquiry / data / pptx skills run on their actual
+  // pipelines; runSkill returns null for Context-Studio-routed skills.
+  if (skillInvocation && skillInvocation.route !== 'context') {
+    try {
+      const result = await runSkill(skillInvocation, hasDataContext ? dataContext : undefined);
+      if (result) {
+        response.json({
+          ...result,
+          dashboard: dashboardDirective,
+          mode: chatMode,
+          skill: skillInvocation.skill,
+          elapsedMs: Date.now() - startedAt
+        });
+        return;
+      }
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : `Skill ${skillInvocation.skill} failed`,
+        tool: skillInvocation.skill,
+        mode: chatMode,
+        elapsedMs: Date.now() - startedAt
+      });
+      return;
+    }
+  }
 
   // ── Data-grounded answering ──────────────────────────────────────────────────
   // With a data source connected (upload / local path / web URL / Google Sheet /
@@ -297,8 +327,32 @@ chatRouter.post('/', async (request, response) => {
   const reportIntent = needsMessage && !forceContextStudio ? detectReportIntent(trimmedMessage) : null;
   if (reportIntent) {
     try {
-      const result = await searchAnnualReport(reportIntent.company, reportIntent.year);
+      const searchOutcome = await searchAnnualReport(reportIntent.company, reportIntent.year);
 
+      // Already ingested in Context Studio — query the knowledge base instead
+      // of re-downloading the PDF (parity with the serverless handler).
+      if ((searchOutcome as ReportAlreadyIngested).ingested) {
+        const ingested = searchOutcome as ReportAlreadyIngested;
+        const config = getConfig();
+        if (config.url) {
+          const csResult = await callTool('context-broker-hybrid-query', {
+            context_id: config.contextId,
+            AgentPersona: config.agentPersona,
+            query: ingested.contextStudioQuery
+          });
+          response.json({
+            reply: extractText(csResult),
+            dashboard: dashboardDirective,
+            tool: 'context-broker-hybrid-query',
+            mode: chatMode,
+            isError: csResult.isError ?? false,
+            elapsedMs: Date.now() - startedAt
+          });
+          return;
+        }
+      }
+
+      const result = searchOutcome as ReportSearchResult;
       const pageInfo = result.pages > 0 ? ` · ${result.pages} pages` : '';
       const header = result.fetched
         ? `✅ Read **${result.title}**${pageInfo} — here is the document content:`

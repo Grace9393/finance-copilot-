@@ -35,11 +35,40 @@ export const QUICK_ACTION_NAMES = [
 
 export const SKILL_NAMES: readonly string[] = [...BOB_SKILL_NAMES, ...QUICK_ACTION_NAMES];
 
+/**
+ * Where each skill actually executes. Not everything is a Context Studio
+ * query — several skills have real local implementations:
+ *   'web'     — live internet search + page read (webSearch pipeline)
+ *   'report'  — annual-report locate/fetch (reportSearch pipeline; CS fast-path if ingested)
+ *   'enquiry' — finance enquiry engine (root cause / projection / liquidity)
+ *   'data'    — answer from the connected data source (requires uploaded/connected data)
+ *   'pptx'    — client-side file → editable PowerPoint via /api/pptx (needs an attached file)
+ *   'context' — Context Studio MCP hybrid query (default for unknown skill names)
+ */
+export type SkillRoute = 'web' | 'report' | 'enquiry' | 'data' | 'pptx' | 'context';
+
+export const SKILL_ROUTES: Record<string, SkillRoute> = {
+  'annual-report-analyzer': 'report',
+  'annual-report-search': 'report',
+  'earnings-peer-comparison': 'web',
+  'web-search': 'web',
+  'industry-search': 'web',
+  'web-document-search': 'web',
+  'financial-variance-analysis': 'enquiry',
+  'margin-lever-playbook': 'enquiry',
+  'pdf-file-reader': 'data',
+  'file-to-pptx': 'pptx'
+};
+
 export interface SkillInvocation {
   /** Canonical skill name */
   skill: string;
+  /** Where this skill executes */
+  route: SkillRoute;
   /** Message to send to Context Studio (with any @ prefix rewritten) */
   message: string;
+  /** The user's free text with the skill invocation phrasing stripped */
+  query: string;
 }
 
 /**
@@ -62,19 +91,36 @@ export function detectSkillInvocation(raw: string): SkillInvocation | null {
         const rest = message.slice(prefixMatch[0].length).trim();
         return {
           skill: match,
-          message: rest ? `Use the ${match} skill: ${rest}` : `Use the ${match} skill.`
+          route: SKILL_ROUTES[match] ?? 'context',
+          message: rest ? `Use the ${match} skill: ${rest}` : `Use the ${match} skill.`,
+          query: rest
         };
       }
     }
   }
 
   // "Use the X skill …" — generic pattern (inserted by the client Skills drawer)
-  const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b/i);
-  if (genericMatch) return { skill: genericMatch[1].toLowerCase(), message };
+  const genericMatch = message.match(/\buse\s+the\s+([\w-]+)\s+skill\b(?:\s*(?:to|for|on|:))?\s*/i);
+  if (genericMatch) {
+    const name = genericMatch[1].toLowerCase();
+    return {
+      skill: name,
+      route: SKILL_ROUTES[name] ?? 'context',
+      message,
+      query: message.slice((genericMatch.index ?? 0) + genericMatch[0].length).trim()
+    };
+  }
 
   // Explicit skill name anywhere in the message (names are unique enough)
   for (const name of SKILL_NAMES) {
-    if (lower.includes(name)) return { skill: name, message };
+    if (lower.includes(name)) {
+      return {
+        skill: name,
+        route: SKILL_ROUTES[name] ?? 'context',
+        message,
+        query: message.replace(new RegExp(name, 'ig'), '').replace(/\s{2,}/g, ' ').trim()
+      };
+    }
   }
 
   return null;

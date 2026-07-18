@@ -5,6 +5,7 @@ import { detectDirective } from '../server/src/dashboardDirective.js';
 import { answerFromDataContext } from '../server/src/dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
 import { detectReportIntent, searchAnnualReport, type ReportAlreadyIngested } from '../server/src/reportSearch.js';
+import { runSkill } from '../server/src/skillRunner.js';
 import { detectSkillInvocation } from '../server/src/skills.js';
 import { webSearch } from '../server/src/webSearch.js';
 import type { ChatMode, DataContext } from '../server/src/routes/chat.js';
@@ -76,13 +77,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const skillInvocation    = needsMessage ? detectSkillInvocation(trimmedMessage) : null;
   const detectedSkill      = skillInvocation?.skill ?? null;
   const isSkill            = detectedSkill !== null;
-  // Force Context Studio when: explicit mode, @context prefix, data is loaded, or a skill is invoked.
-  const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || isSkill;
+  // Only Context-Studio-routed skills force the MCP path — skills with real
+  // local implementations (web / report / enquiry / data / pptx) execute below.
+  const forceContextStudio = isExplicitCSMode || isContextPrefix || hasDataContext || skillInvocation?.route === 'context';
 
   // Dashboard-control directive: chat questions steer the dashboard live.
   const dashboardDirective = needsMessage
     ? detectDirective(trimmedMessage, hasDataContext ? dataContext : undefined)
     : undefined;
+
+  // Skill execution on real implementations (web / report / enquiry / data / pptx)
+  if (skillInvocation && skillInvocation.route !== 'context') {
+    try {
+      const result = await runSkill(skillInvocation, hasDataContext ? dataContext : undefined);
+      if (result) {
+        res.json({ ...result, dashboard: dashboardDirective, mode: chatMode, skill: skillInvocation.skill, elapsedMs: Date.now() - startedAt });
+        return;
+      }
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : `Skill ${skillInvocation.skill} failed`, tool: skillInvocation.skill, mode: chatMode, elapsedMs: Date.now() - startedAt });
+      return;
+    }
+  }
 
   // Data-grounded answering: with a data source connected, plain hybrid
   // questions are answered from the data itself (Context Studio retrieval

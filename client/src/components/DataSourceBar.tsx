@@ -26,9 +26,11 @@ interface DataSourceBarProps {
   connectedSource?: string | null;
   onConnect: (dataset: FinanceDataset) => void;
   onClear?: () => void;
+  /** Reports the raw File on uploads (null for path/URL/sheet connects) — lets the chat keep it for @file-to-pptx */
+  onFileSelected?: (file: File | null) => void;
 }
 
-export function DataSourceBar({ compact, connectedSource, onConnect, onClear }: DataSourceBarProps) {
+export function DataSourceBar({ compact, connectedSource, onConnect, onClear, onFileSelected }: DataSourceBarProps) {
   const [picker, setPicker] = useState<PickerKind>(null);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,6 +43,7 @@ export function DataSourceBar({ compact, connectedSource, onConnect, onClear }: 
     setError('');
     try {
       const dataset = await connectSource(picker, value.trim());
+      onFileSelected?.(null);
       onConnect(dataset);
       setPicker(null);
       setValue('');
@@ -56,6 +59,7 @@ export function DataSourceBar({ compact, connectedSource, onConnect, onClear }: 
     setError('');
     try {
       const dataset = await uploadFile(file);
+      onFileSelected?.(file);
       onConnect(dataset);
       setPicker(null);
     } catch (err) {
