@@ -119,5 +119,11 @@ npm run build
 
 ## Deploy
 
-- **Render**: `render.yaml` (client static + server web service)
-- **Vercel**: `vercel.json` + `api/*.ts` serverless wrappers (`/api/dashboard` included)
+**Vercel** (production): `vercel.json` routes all `/api/*` requests to the serverless wrappers in `api-dist/` (pre-bundled by `scripts/bundle-api.mjs`) and serves the Vite-built SPA from `client/dist/`.
+
+```bash
+npm run build   # tsc -b + vite build + esbuild bundle
+vercel --prod
+```
+
+Live URL: **https://ibm-finance-studio.vercel.app**

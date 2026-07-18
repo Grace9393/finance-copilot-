@@ -1,13 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { readFile, writeFile, unlink, mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import { buildPptxFromFile } from '../server/src/pptxGen.js';
 
 export const config = { api: { bodyParser: false } };
-
-const execFileAsync = promisify(execFile);
 
 // ── Multipart parser (same pattern as upload.ts) ──────────────────────────────
 
@@ -76,6 +70,11 @@ function parseMultipart(buffer: Buffer, boundary: string): MultipartFields {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+/**
+ * Serverless wrapper for POST /api/pptx — pure-JS generation (pptxgenjs),
+ * shared with the Express route via server/src/pptxGen.ts. The previous
+ * python-script approach could not run on Vercel (spawn python ENOENT).
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -103,47 +102,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (!file.mimetype.startsWith('image/')) {
-    res.status(415).json({ error: `Expected an image file, got: ${file.mimetype}` });
-    return;
-  }
-
-  // Write temp files, run Python script, read output back
-  const tmpDir = await mkdtemp(path.join(tmpdir(), 'pptx-'));
-  const ext = path.extname(file.filename) || '.png';
-  const imgPath = path.join(tmpDir, `input${ext}`);
-  const outPath = path.join(tmpDir, 'output.pptx');
-
   try {
-    await writeFile(imgPath, file.data);
-
-    const scriptPath = path.resolve(process.cwd(), 'server/scripts/image_to_pptx.py');
-    const args = [scriptPath, imgPath, outPath];
-    if (title) args.push('--title', title);
-
-    try {
-      await execFileAsync('python3', args, { timeout: 30000 });
-    } catch {
-      // Fallback to `python` on Windows / some environments
-      await execFileAsync('python', args, { timeout: 30000 });
-    }
-
-    const pptxBuffer = await readFile(outPath);
-    const base64 = pptxBuffer.toString('base64');
-    const outputFilename = `${path.basename(file.filename, ext) || 'presentation'}.pptx`;
-
-    res.json({
-      filename: outputFilename,
-      base64,
-      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      slideCount: 1,
-      warnings: [] as string[],
-    });
+    res.json(await buildPptxFromFile(file.data, file.filename, file.mimetype, title || undefined));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'PPTX generation failed' });
-  } finally {
-    // Clean up temp files (best-effort)
-    await unlink(imgPath).catch(() => undefined);
-    await unlink(outPath).catch(() => undefined);
+    const message = err instanceof Error ? err.message : 'PPTX generation failed';
+    res.status(message.startsWith('Unsupported') ? 415 : 422).json({ error: message });
   }
 }

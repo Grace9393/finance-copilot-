@@ -32,7 +32,7 @@ let cachedConfig: ContextStudioConfig | null = null;
 // Also reset session state so each serverless invocation gets a fresh MCP session
 
 function loadFileConfig(): Partial<ContextStudioConfig> {
-  // Try to load from file (local dev / Railway) — silently skip if missing.
+  // Try to load from file (local dev) — silently skip if missing.
   // fs + cwd-relative paths work in both ESM (tsx / node dist) and serverless
   // CJS bundles; on Vercel the file is absent and env vars are used instead.
   const candidates = [
