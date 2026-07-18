@@ -437,14 +437,14 @@ interface ChatPanelProps {
 }
 
 const DEFAULT_WELCOME =
-  'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.';
+  'Hello! I\'m connected to your Context Studio knowledge base.\n\n**To search your Context Studio knowledge base:**\n• Click **Vector** or **Graph** mode — always queries Context Studio\n• Or prefix any message with **@context** — e.g. "@context summarize IBM financials"\n\n**To search the web** (no data loaded):\n• Type naturally in Hybrid mode — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF\n\nOr drop a file (PDF, Excel, CSV…) into the upload zone.';
 
 export function ChatPanel({ dataContext, onDataContextChange, welcomeText, suggestions, showSourceBar, onDashboardDirective }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: nextId(),
       role: 'assistant',
-      text: 'Hello! I\'m connected to your GraceTest Context Studio context.\n\n**Skills & Context Studio (always available):**\n• Click **⚡ Skills** to pick a skill — e.g. "Use the financial-variance-analysis skill to…"\n• Use **Vector** or **Graph** mode to search the knowledge base directly\n• Prefix any message with **@context** — e.g. "@context summarize IBM financials"\n• Drop a file (PDF, Excel, CSV…) — all follow-up questions are grounded on it\n\n**Web search (hybrid mode, no data loaded):**\n• Type naturally — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF'
+      text: 'Hello! I\'m connected to your Context Studio knowledge base.\n\n**Skills & Context Studio (always available):**\n• Click **⚡ Skills** to pick a skill — e.g. "Use the financial-variance-analysis skill to…"\n• Use **Vector** or **Graph** mode to search the knowledge base directly\n• Prefix any message with **@context** — e.g. "@context summarize IBM financials"\n• Drop a file (PDF, Excel, CSV…) — all follow-up questions are grounded on it\n\n**Web search (hybrid mode, no data loaded):**\n• Type naturally — "AI industry trends 2025"\n• "IBM 2025 annual report" — auto-fetches the PDF'
     }
   ]);
   const [input, setInput] = useState('');
@@ -705,7 +705,7 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
       <div className="chat-header">
         <div>
           <div className="chat-title">Context Studio Chat</div>
-          <div className="chat-subtitle muted">GraceTest · ctx_09f7830c068c</div>
+          <div className="chat-subtitle muted">Context Studio</div>
           {activeBadge ? (
             <div className="chat-datasource-badge">{activeBadge}</div>
           ) : (

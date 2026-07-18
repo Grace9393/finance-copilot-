@@ -10,6 +10,12 @@ server/dist/
 .env.local
 .env.*.local
 
+# Local Context Studio credentials — never commit live tokens
+server/context-studio.json
+
+# Local HTML artefacts with internal metadata
+context-studio-organisation-summary.html
+
 # Logs
 *.log
 npm-debug.log*
