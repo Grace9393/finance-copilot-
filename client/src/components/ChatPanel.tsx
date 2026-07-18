@@ -34,14 +34,15 @@ const MODE_LABELS: Record<ChatMode, string> = {
 };
 
 const MODE_TIPS: Record<ChatMode, string> = {
-  hybrid: 'Context Studio when data is loaded, a skill is invoked, or @context prefix is used. Falls back to web search otherwise.',
-  vector: 'Semantic similarity search — always queries Context Studio knowledge base',
-  graph: 'Knowledge graph traversal — always queries Context Studio knowledge base',
+  hybrid: 'Smart routing — finance engine, web search, or Context Studio depending on the question',
+  vector: 'Semantic search — directly queries the Context Studio knowledge base',
+  graph: 'Knowledge graph — traverses entity relationships in Context Studio',
   schema: 'Fetch Context Studio schema',
   metadata: 'Fetch Context Studio metadata',
   contexts: 'List all team contexts'
 };
 
+/** Only these three are surfaced as buttons — schema/metadata/contexts are dev-only. */
 const QUERY_MODES: ChatMode[] = ['hybrid', 'vector', 'graph'];
 
 /**
@@ -808,9 +809,9 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
         </div>
       )}
 
-      {/* Mode selector */}
+      {/* Mode selector — Hybrid / Vector / Graph only (schema/metadata/contexts are dev-only) */}
       <div className="chat-modes">
-        {(Object.keys(MODE_LABELS) as ChatMode[]).map((m) => (
+        {QUERY_MODES.map((m) => (
           <button key={m} className={`chat-mode-btn${mode === m ? ' active' : ''}`}
             onClick={() => setMode(m)} title={MODE_TIPS[m]} type="button">
             {MODE_LABELS[m]}
