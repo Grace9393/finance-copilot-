@@ -10,12 +10,16 @@
  *  - PDFs    → title slide + editable bullet slides from the extracted text.
  */
 
-import PptxGenJS from 'pptxgenjs';
+import PptxGenJSImport from 'pptxgenjs';
 import { pdfToText } from './pdfText.js';
 
-// pptxgenjs type exports don't play well with NodeNext — derive what we need
-type Deck = InstanceType<typeof PptxGenJS>;
-type DeckSlide = ReturnType<Deck['addSlide']>;
+// pptxgenjs ships CJS whose type declarations clash with NodeNext resolution —
+// the runtime default import IS the class, so cast the constructor and keep
+// instances loosely typed.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const PptxGenJS = (((PptxGenJSImport as any).default ?? PptxGenJSImport) as unknown) as new () => any;
+type Deck = any;
+type DeckSlide = any;
 
 export interface PptxResult {
   filename: string;

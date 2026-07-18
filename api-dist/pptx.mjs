@@ -47087,6 +47087,7 @@ async function pdfToText(buffer) {
 }
 
 // server/src/pptxGen.ts
+var PptxGenJS2 = PptxGenJS.default ?? PptxGenJS;
 var PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 var CARBON = {
   dark: "161616",
@@ -47096,7 +47097,7 @@ var CARBON = {
   white: "FFFFFF"
 };
 function newDeck() {
-  const deck = new PptxGenJS();
+  const deck = new PptxGenJS2();
   deck.defineLayout({ name: "WIDE", width: 13.33, height: 7.5 });
   deck.layout = "WIDE";
   return deck;
