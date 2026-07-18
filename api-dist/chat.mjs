@@ -5281,6 +5281,30 @@ function tryParseContextResult(raw) {
   }
   if (!obj || typeof obj !== "object") return null;
   const data = obj;
+  if (data.context_metadata && typeof data.context_metadata === "object") {
+    const meta = data.context_metadata;
+    const docs = Array.isArray(meta.manually_ingested_documents) ? meta.manually_ingested_documents : [];
+    if (docs.length > 0) {
+      const rows = docs.map((d) => ({
+        File: String(d.file_name ?? ""),
+        Type: String(d.file_type ?? ""),
+        Status: String(d.ingestion_status ?? ""),
+        "Graph nodes": Number(d.nodes_extracted ?? 0),
+        Ingested: String(d.ingested_at ?? "").slice(0, 10)
+      }));
+      const ready = rows.filter((r2) => r2.Status.toLowerCase() === "ready").length;
+      const pending = rows.length - ready;
+      return [
+        `## Documents in context ${String(meta.name ?? meta.context_id ?? "")}`,
+        "",
+        "```json",
+        JSON.stringify(rows, null, 1),
+        "```",
+        "",
+        `**${rows.length} documents** \u2014 ${ready} ready, ${pending} pending.` + (pending > 0 ? " \u26A0\uFE0F Pending documents are not yet queryable (no chunks/embeddings) \u2014 re-trigger their ingestion in Context Studio." : "")
+      ].join("\n");
+    }
+  }
   if (Array.isArray(data.items)) {
     return formatPassages(extractPassages(data.items));
   }
@@ -39982,7 +40006,8 @@ async function handler(req, res) {
     }
     const csMessage = isContextPrefix ? trimmedMessage.replace(/^@context\s*/i, "").trim() : skillInvocation?.message ?? trimmedMessage;
     const groundedMessage = buildGroundedMessage(csMessage, dataContext);
-    const { tool: tool2, args: args2 } = buildToolCall(chatMode, groundedMessage);
+    const wantsDocumentList = /\b(list|show|what|which)\b[^.?!]*\b(documents?|files?|sources?)\b|\bdocuments? (list|inventory)\b/i.test(csMessage);
+    const { tool: tool2, args: args2 } = wantsDocumentList ? { tool: "context-broker-get-context-metadata", args: { context_id: config2.contextId } } : buildToolCall(chatMode, groundedMessage);
     try {
       const result = await callTool(tool2, args2);
       res.json({ reply: extractText(result), dashboard: dashboardDirective, tool: tool2, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? void 0 });

@@ -265,6 +265,33 @@ function tryParseContextResult(raw: string): string | null {
 
   const data = obj as Record<string, unknown>;
 
+  // Shape F: { context_metadata: { manually_ingested_documents: [...] } }
+  if (data.context_metadata && typeof data.context_metadata === 'object') {
+    const meta = data.context_metadata as Record<string, unknown>;
+    const docs = Array.isArray(meta.manually_ingested_documents) ? meta.manually_ingested_documents as Record<string, unknown>[] : [];
+    if (docs.length > 0) {
+      const rows = docs.map((d) => ({
+        File: String(d.file_name ?? ''),
+        Type: String(d.file_type ?? ''),
+        Status: String(d.ingestion_status ?? ''),
+        'Graph nodes': Number(d.nodes_extracted ?? 0),
+        Ingested: String(d.ingested_at ?? '').slice(0, 10)
+      }));
+      const ready = rows.filter((r) => r.Status.toLowerCase() === 'ready').length;
+      const pending = rows.length - ready;
+      return [
+        `## Documents in context ${String(meta.name ?? meta.context_id ?? '')}`,
+        '',
+        '```json',
+        JSON.stringify(rows, null, 1),
+        '```',
+        '',
+        `**${rows.length} documents** — ${ready} ready, ${pending} pending.` +
+        (pending > 0 ? ' ⚠️ Pending documents are not yet queryable (no chunks/embeddings) — re-trigger their ingestion in Context Studio.' : '')
+      ].join('\n');
+    }
+  }
+
   // Shape D: { items: [...] } — vector query result
   if (Array.isArray(data.items)) {
     return formatPassages(extractPassages(data.items as unknown[]));

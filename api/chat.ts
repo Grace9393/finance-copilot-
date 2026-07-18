@@ -181,7 +181,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? trimmedMessage.replace(/^@context\s*/i, '').trim()
       : (skillInvocation?.message ?? trimmedMessage);
     const groundedMessage = buildGroundedMessage(csMessage, dataContext);
-    const { tool, args } = buildToolCall(chatMode, groundedMessage);
+    // "list documents / what files are in the context" → metadata endpoint;
+    // hybrid retrieval searches content and cannot enumerate the library.
+    const wantsDocumentList = /\b(list|show|what|which)\b[^.?!]*\b(documents?|files?|sources?)\b|\bdocuments? (list|inventory)\b/i.test(csMessage);
+    const { tool, args } = wantsDocumentList
+      ? { tool: 'context-broker-get-context-metadata', args: { context_id: config.contextId } as Record<string, unknown> }
+      : buildToolCall(chatMode, groundedMessage);
     try {
       const result = await callTool(tool, args);
       res.json({ reply: extractText(result), dashboard: dashboardDirective, tool, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? undefined });
