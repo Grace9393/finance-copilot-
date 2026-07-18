@@ -27,8 +27,9 @@ const fmtNum = (v: number): string => {
 
 export function DynamicDashboard({ dataset, directive, onClear }: DynamicDashboardProps) {
   const { numericFields, categoricalFields, filterableFields } = useMemo(() => {
+    const isDateOrId = (f: string) => /date|_id$|^id$|number$/i.test(f);
     const numeric = dataset.fields.filter((f) =>
-      dataset.rows.length > 0 && dataset.rows.every((r) => r[f] === '' || typeof r[f] === 'number'));
+      !isDateOrId(f) && dataset.rows.length > 0 && dataset.rows.every((r) => r[f] === '' || typeof r[f] === 'number'));
     const categorical = dataset.fields.filter((f) => !numeric.includes(f));
     const filterable = categorical.filter((f) => {
       const cardinality = new Set(dataset.rows.map((r) => String(r[f]))).size;
@@ -158,7 +159,7 @@ export function DynamicDashboard({ dataset, directive, onClear }: DynamicDashboa
       {chartData.length > 0 && dimension && measure && (
         <>
           <h3 className="subsection-title" style={{ marginTop: 4 }}>{measure} by {dimension}</h3>
-          <BarChart data={chartData} />
+          <BarChart data={chartData} format={fmtNum} />
         </>
       )}
     </div>

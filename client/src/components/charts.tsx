@@ -35,7 +35,8 @@ export interface BarDatum {
   notes?: string;
 }
 
-export function BarChart({ data, height = 34 }: { data: BarDatum[]; height?: number }) {
+export function BarChart({ data, height = 34, format }: { data: BarDatum[]; height?: number; format?: (v: number) => string }) {
+  const fmt = format ?? fmtM;
   const max = Math.max(...data.map((d) => d.value), 1);
   const chartWidth = 560;
   const labelWidth = 110;
@@ -52,11 +53,11 @@ export function BarChart({ data, height = 34 }: { data: BarDatum[]; height?: num
         const growth = d.growthPct !== undefined ? ` (${d.growthPct >= 0 ? '+' : ''}${d.growthPct.toFixed(1)}% YoY)` : '';
         return (
           <g key={d.label}>
-            <title>{`${d.label}: ${fmtM(d.value)}${growth}${d.notes ? ` — ${d.notes}` : ''}`}</title>
+            <title>{`${d.label}: ${fmt(d.value)}${growth}${d.notes ? ` — ${d.notes}` : ''}`}</title>
             <text x={labelWidth - 8} y={y + height / 2 + 4} textAnchor="end" fontSize="12" fill="#475569">{d.label}</text>
             <rect x={labelWidth} y={y + 7} width={w} height={height - 14} rx="4" fill={color} />
             <text x={labelWidth + w + 8} y={y + height / 2 + 4} fontSize="12" fontWeight="600" fill="#1e293b">
-              {fmtM(d.value)}
+              {fmt(d.value)}
               {d.growthPct !== undefined && (
                 <tspan fill={d.growthPct >= 0 ? '#15803d' : '#b91c1c'} fontWeight="500">
                   {`  ${d.growthPct >= 0 ? '▲' : '▼'} ${Math.abs(d.growthPct).toFixed(1)}%`}
