@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import './App.css';
-import { DashboardDirective, DataContext, FinanceDataset } from './api';
+import { DashboardDirective, DataContext, FinanceDataset, toChatContext } from './api';
 import { ChatPanel, ChatSuggestion } from './components/ChatPanel';
 import { DEFAULT_EPM_FILTERS, DashboardSection, EpmFilters } from './components/DashboardSection';
 import { DataSourceBar } from './components/DataSourceBar';
@@ -71,12 +71,9 @@ export default function App() {
 
   const externalContext: DataContext | undefined = useMemo(() => {
     if (!externalData?.rows?.length) return undefined;
-    return {
-      source: externalData.source,
-      fields: externalData.fields,
-      rows: externalData.rows,
-      narrative: `External data source connected: ${externalData.source}`
-    };
+    // Sampled for chat transport (serverless body limit); the dynamic
+    // dashboard itself renders from the full dataset client-side.
+    return toChatContext(externalData, `External data source connected: ${externalData.source}`);
   }, [externalData]);
 
   return (

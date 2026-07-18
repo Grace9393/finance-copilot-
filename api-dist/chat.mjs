@@ -5772,17 +5772,32 @@ function detectDataDirective(message, ctx) {
   const categorical = ctx.fields.filter((f3) => !numeric.includes(f3));
   const byMatch = message.toLowerCase().match(/\bby\s+([\w /-]{2,30})/);
   const byTerm = byMatch ? norm(byMatch[1]) : "";
-  for (const f3 of categorical) {
-    const nf = norm(f3);
-    if (nf.length < 3) continue;
-    if (byTerm && (byTerm.startsWith(nf) || nf.startsWith(byTerm)) || m2.includes(nf)) {
-      out.dimension = f3;
-      break;
+  const fieldMentioned = (field) => {
+    const nf = norm(field);
+    if (nf.length < 3) return false;
+    if (m2.includes(nf)) return true;
+    const prefix = nf.slice(0, Math.max(8, Math.ceil(nf.length * 0.6)));
+    return nf.length >= 8 && m2.includes(prefix);
+  };
+  if (byTerm) {
+    for (const f3 of categorical) {
+      const nf = norm(f3);
+      if (nf.length >= 3 && (byTerm === nf || byTerm.startsWith(nf) || nf.startsWith(byTerm))) {
+        out.dimension = f3;
+        break;
+      }
+    }
+  }
+  if (!out.dimension && !byTerm) {
+    for (const f3 of categorical) {
+      if (fieldMentioned(f3)) {
+        out.dimension = f3;
+        break;
+      }
     }
   }
   for (const f3 of numeric) {
-    const nf = norm(f3);
-    if (nf.length >= 3 && m2.includes(nf)) {
+    if (fieldMentioned(f3)) {
       out.measure = f3;
       break;
     }

@@ -229,6 +229,26 @@ export async function sendChatMessage(
 /** Hosted deployments (Vercel serverless) reject request bodies over ~4.5 MB. */
 export const HOSTED_UPLOAD_LIMIT_BYTES = 4.5 * 1024 * 1024;
 
+/**
+ * Max rows sent as chat data context. Large datasets (e.g. 8k-row Excel files)
+ * would otherwise exceed the serverless request-body limit on every message —
+ * the full dataset still drives the client-side dynamic dashboard; the chat
+ * grounds on this sample.
+ */
+export const MAX_CONTEXT_ROWS = 500;
+
+/** Trim a dataset to a chat-safe data context sample. */
+export function toChatContext(dataset: FinanceDataset, narrative?: string): DataContext {
+  return {
+    source: dataset.source,
+    fields: dataset.fields,
+    rows: dataset.rows.slice(0, MAX_CONTEXT_ROWS),
+    narrative: narrative ?? (dataset.rows.length > MAX_CONTEXT_ROWS
+      ? `Sample of first ${MAX_CONTEXT_ROWS} of ${dataset.rows.length} rows from ${dataset.source}`
+      : undefined)
+  };
+}
+
 function isHostedDeployment(): boolean {
   return typeof location !== 'undefined' && !['localhost', '127.0.0.1'].includes(location.hostname);
 }

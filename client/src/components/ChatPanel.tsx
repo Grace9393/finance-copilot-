@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChatMode, ChatReply, DashboardDirective, DataContext, FinanceDataset, IcaChatStatus, PptxReply, convertToPptx, getChatStatus, getIcaChatStatus, sendChatMessage, sendIcaMessage, uploadFile } from '../api';
+import { ChatMode, ChatReply, DashboardDirective, DataContext, FinanceDataset, IcaChatStatus, PptxReply, convertToPptx, getChatStatus, getIcaChatStatus, sendChatMessage, sendIcaMessage, toChatContext, uploadFile } from '../api';
 import { DataSourceBar, UPLOAD_ACCEPT } from './DataSourceBar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -521,7 +521,7 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
 
   // Build the effective data context: uploaded file > report full text > left panel
   const effectiveContext: DataContext | undefined = uploadedDataset
-    ? { source: uploadedDataset.source, fields: uploadedDataset.fields, rows: uploadedDataset.rows }
+    ? toChatContext(uploadedDataset)
     : reportContext
       ? {
           source: reportContext.title,

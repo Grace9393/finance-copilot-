@@ -82,20 +82,36 @@ export function detectDataDirective(message: string, ctx: DataContextShape): Das
   const byMatch = message.toLowerCase().match(/\bby\s+([\w /-]{2,30})/);
   const byTerm = byMatch ? norm(byMatch[1]) : '';
 
-  for (const f of categorical) {
-    const nf = norm(f);
-    if (nf.length < 3) continue;
-    if ((byTerm && (byTerm.startsWith(nf) || nf.startsWith(byTerm))) || m.includes(nf)) {
-      out.dimension = f;
-      break;
+  // A field "matches" loosely: full normalized name, or a meaningful prefix
+  // (handles suffixes like _USD and partial mentions like "pipeline influenced").
+  const fieldMentioned = (field: string): boolean => {
+    const nf = norm(field);
+    if (nf.length < 3) return false;
+    if (m.includes(nf)) return true;
+    const prefix = nf.slice(0, Math.max(8, Math.ceil(nf.length * 0.6)));
+    return nf.length >= 8 && m.includes(prefix);
+  };
+
+  // Dimension: the explicit "by <field>" phrase wins outright; only fall back
+  // to a general mention scan when no "by" phrase resolves (prevents e.g.
+  // "Marketing_Spend" accidentally matching a "Market" field).
+  if (byTerm) {
+    for (const f of categorical) {
+      const nf = norm(f);
+      if (nf.length >= 3 && (byTerm === nf || byTerm.startsWith(nf) || nf.startsWith(byTerm))) {
+        out.dimension = f;
+        break;
+      }
     }
   }
-  for (const f of numeric) {
-    const nf = norm(f);
-    if (nf.length >= 3 && m.includes(nf)) {
-      out.measure = f;
-      break;
+  if (!out.dimension && !byTerm) {
+    for (const f of categorical) {
+      if (fieldMentioned(f)) { out.dimension = f; break; }
     }
+  }
+
+  for (const f of numeric) {
+    if (fieldMentioned(f)) { out.measure = f; break; }
   }
 
   return Object.keys(out).length > 0 ? out : null;
