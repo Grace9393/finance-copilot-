@@ -840,7 +840,7 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
         {showSourceBar && (
           <DataSourceBar
             compact
-            connectedSource={uploadedDataset?.source ?? null}
+            connectedSource={null}
             onFileSelected={setPendingFile}
             onConnect={(dataset) => {
               setUploadedDataset(dataset);

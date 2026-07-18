@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ExternalSourceType, FinanceDataset, connectSource, uploadFile } from '../api';
+import { ExternalSourceType, FinanceDataset, connectSource, isHostedDeployment, uploadFile } from '../api';
 
 /**
  * DataSourceBar — connect buttons for external data sources, used by both the
@@ -69,9 +69,20 @@ export function DataSourceBar({ compact, connectedSource, onConnect, onClear, on
     }
   }
 
+  const [notice, setNotice] = useState('');
+
   function togglePicker(kind: Exclude<PickerKind, null>) {
     setError('');
+    setNotice('');
     setValue('');
+    // The hosted site cannot read the user's disk — turn "Local path" into a
+    // guided file-pick (same file, uploaded) instead of a dead end.
+    if (kind === 'localPath' && isHostedDeployment()) {
+      setNotice('The hosted site can’t read local paths — pick the same file in the browser instead (it uploads securely).');
+      setPicker(null);
+      fileRef.current?.click();
+      return;
+    }
     setPicker((current) => (current === kind ? null : kind));
   }
 
@@ -98,8 +109,8 @@ export function DataSourceBar({ compact, connectedSource, onConnect, onClear, on
           📊 Google Sheet
         </button>
         {connectedSource && onClear && (
-          <button className="source-btn clear" type="button" onClick={onClear} title="Disconnect the external source">
-            ✕ {connectedSource.length > 28 ? `${connectedSource.slice(0, 28)}…` : connectedSource}
+          <button className="source-btn connected" type="button" onClick={onClear} title="Connected — click to disconnect">
+            ✓ {connectedSource.length > 28 ? `${connectedSource.slice(0, 28)}…` : connectedSource} ✕
           </button>
         )}
       </div>
@@ -122,6 +133,7 @@ export function DataSourceBar({ compact, connectedSource, onConnect, onClear, on
       )}
 
       {busy && !picker && <div className="muted source-bar-status">Parsing file…</div>}
+      {notice && !busy && <div className="muted source-bar-status">💡 {notice}</div>}
       {error && <div className="error-text source-bar-status">{error}</div>}
     </div>
   );

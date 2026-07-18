@@ -311,6 +311,18 @@ select {
   background: #fef2f2;
 }
 
+.source-btn.connected {
+  border-color: #bbf7d0;
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.source-btn.connected:hover {
+  border-color: #fca5a5;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
 .source-btn:disabled {
   opacity: 0.55;
   cursor: wait;
