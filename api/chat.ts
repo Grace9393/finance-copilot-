@@ -4,7 +4,7 @@ import { callTool, extractText, getConfig, listTools } from '../server/src/conte
 import { detectDirective } from '../server/src/dashboardDirective.js';
 import { answerFromDataContext } from '../server/src/dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
-import { detectReportIntent, searchAnnualReport } from '../server/src/reportSearch.js';
+import { detectReportIntent, searchAnnualReport, type ReportAlreadyIngested } from '../server/src/reportSearch.js';
 import { detectSkillInvocation } from '../server/src/skills.js';
 import { webSearch } from '../server/src/webSearch.js';
 import type { ChatMode, DataContext } from '../server/src/routes/chat.js';
@@ -116,21 +116,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (reportIntent) {
     try {
       const result = await searchAnnualReport(reportIntent.company, reportIntent.year);
-      const pageInfo = result.pages > 0 ? ` · ${result.pages} pages` : '';
-      const header = result.fetched
-        ? `✅ Read **${result.title}**${pageInfo} — here is the document content:`
-        : `🔍 Searched the web for **${result.title}** — here is what was found:`;
-      const cleanExcerpt = result.excerpt.replace(/\f/g, '\n\n').replace(/[ \t]{3,}/g, '  ').replace(/\n{4,}/g, '\n\n\n').trim();
+
+      // Already ingested in Context Studio — re-route to CS hybrid query (fast path).
+      if ((result as ReportAlreadyIngested).ingested) {
+        const ingested = result as ReportAlreadyIngested;
+        const config = getConfig();
+        if (config.url) {
+          const csResult = await callTool('context-broker-hybrid-query', {
+            context_id: config.contextId,
+            AgentPersona: config.agentPersona,
+            query: ingested.contextStudioQuery
+          });
+          res.json({ reply: extractText(csResult), dashboard: dashboardDirective, tool: 'context-broker-hybrid-query', mode: chatMode, isError: csResult.isError ?? false, elapsedMs: Date.now() - startedAt });
+          return;
+        }
+      }
+
+      const r = result as import('../server/src/reportSearch.js').ReportSearchResult;
+      const pageInfo = r.pages > 0 ? ` · ${r.pages} pages` : '';
+      const header = r.fetched
+        ? `✅ Read **${r.title}**${pageInfo} — here is the document content:`
+        : `🔍 Searched the web for **${r.title}** — here is what was found:`;
+      const cleanExcerpt = r.excerpt.replace(/\f/g, '\n\n').replace(/[ \t]{3,}/g, '  ').replace(/\n{4,}/g, '\n\n\n').trim();
       const lines = [
-        `## ${result.title}`, '',
+        `## ${r.title}`, '',
         header, '',
         cleanExcerpt || '_(No content could be extracted)_', '',
-        `**Source:** [${result.url}](${result.url})`, '',
-        result.fetched
+        `**Source:** [${r.url}](${r.url})`, '',
+        r.fetched
           ? `_Ask me to summarize financials, compare with another company, or analyse specific sections._`
           : `_Try asking again or specify the company's investor relations page URL._`
       ].join('\n');
-      res.json({ reply: lines, dashboard: dashboardDirective, tool: 'report-search', mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: 'report-search', mode: chatMode, isError: !r.fetched, elapsedMs: Date.now() - startedAt, reportUrl: r.url, reportFullText: r.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Report search failed', tool: 'report-search', mode: chatMode, elapsedMs: Date.now() - startedAt });
     }

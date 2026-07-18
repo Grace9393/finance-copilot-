@@ -39561,6 +39561,7 @@ var KNOWN_REPORT_URLS = {
     "2024": "https://microsoft.gcs-web.com/static-files/annual-reports/2024-annual-report.pdf"
   }
 };
+var CS_INGESTED_KEYS = /* @__PURE__ */ new Set(["ibm"]);
 function detectReportIntent(message) {
   const currentYear = String((/* @__PURE__ */ new Date()).getFullYear());
   const withYear = /\b([A-Za-z][A-Za-z0-9\s&.,\-]{1,40}?)\s+(?:FY\s*)?(\d{4})\s+(?:annual\s+)?(?:report|10-K|10K|results|filing|earnings)\b/i;
@@ -39625,6 +39626,14 @@ function extractPdfUrl(text) {
 }
 async function searchAnnualReport(company, year) {
   const companyKey = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (CS_INGESTED_KEYS.has(companyKey)) {
+    return {
+      ingested: true,
+      company,
+      year,
+      contextStudioQuery: `${company} ${year} annual report financial results`
+    };
+  }
   const knownUrl = KNOWN_REPORT_URLS[companyKey]?.[year];
   if (knownUrl) {
     try {
@@ -39808,21 +39817,35 @@ async function handler(req, res) {
   if (reportIntent) {
     try {
       const result = await searchAnnualReport(reportIntent.company, reportIntent.year);
-      const pageInfo = result.pages > 0 ? ` \xB7 ${result.pages} pages` : "";
-      const header = result.fetched ? `\u2705 Read **${result.title}**${pageInfo} \u2014 here is the document content:` : `\u{1F50D} Searched the web for **${result.title}** \u2014 here is what was found:`;
-      const cleanExcerpt = result.excerpt.replace(/\f/g, "\n\n").replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n").trim();
+      if (result.ingested) {
+        const ingested = result;
+        const config2 = getConfig();
+        if (config2.url) {
+          const csResult = await callTool("context-broker-hybrid-query", {
+            context_id: config2.contextId,
+            AgentPersona: config2.agentPersona,
+            query: ingested.contextStudioQuery
+          });
+          res.json({ reply: extractText(csResult), dashboard: dashboardDirective, tool: "context-broker-hybrid-query", mode: chatMode, isError: csResult.isError ?? false, elapsedMs: Date.now() - startedAt });
+          return;
+        }
+      }
+      const r2 = result;
+      const pageInfo = r2.pages > 0 ? ` \xB7 ${r2.pages} pages` : "";
+      const header = r2.fetched ? `\u2705 Read **${r2.title}**${pageInfo} \u2014 here is the document content:` : `\u{1F50D} Searched the web for **${r2.title}** \u2014 here is what was found:`;
+      const cleanExcerpt = r2.excerpt.replace(/\f/g, "\n\n").replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n").trim();
       const lines = [
-        `## ${result.title}`,
+        `## ${r2.title}`,
         "",
         header,
         "",
         cleanExcerpt || "_(No content could be extracted)_",
         "",
-        `**Source:** [${result.url}](${result.url})`,
+        `**Source:** [${r2.url}](${r2.url})`,
         "",
-        result.fetched ? `_Ask me to summarize financials, compare with another company, or analyse specific sections._` : `_Try asking again or specify the company's investor relations page URL._`
+        r2.fetched ? `_Ask me to summarize financials, compare with another company, or analyse specific sections._` : `_Try asking again or specify the company's investor relations page URL._`
       ].join("\n");
-      res.json({ reply: lines, dashboard: dashboardDirective, tool: "report-search", mode: chatMode, isError: !result.fetched, elapsedMs: Date.now() - startedAt, reportUrl: result.url, reportFullText: result.fullText });
+      res.json({ reply: lines, dashboard: dashboardDirective, tool: "report-search", mode: chatMode, isError: !r2.fetched, elapsedMs: Date.now() - startedAt, reportUrl: r2.url, reportFullText: r2.fullText });
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Report search failed", tool: "report-search", mode: chatMode, elapsedMs: Date.now() - startedAt });
     }

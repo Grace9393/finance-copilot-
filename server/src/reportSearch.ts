@@ -41,6 +41,19 @@ const KNOWN_REPORT_URLS: Record<string, Record<string, string>> = {
 };
 
 /**
+ * Companies whose reports are already ingested in Context Studio.
+ * For these, skip the PDF download and let the caller route to CS instead.
+ */
+const CS_INGESTED_KEYS = new Set(['ibm']);
+
+export interface ReportAlreadyIngested {
+  ingested: true;
+  company: string;
+  year: string;
+  contextStudioQuery: string;
+}
+
+/**
  * Detects report-search intent in a message.
  * Returns { company, year } if found, otherwise null.
  * Year defaults to the current year when not specified.
@@ -148,9 +161,24 @@ function extractPdfUrl(text: string): string | null {
 
 /**
  * Main entry point: find and read the annual report PDF for a company + year.
+ * Returns ReportAlreadyIngested when the report is in Context Studio — the
+ * caller should route to CS hybrid-query instead of downloading the PDF.
  */
-export async function searchAnnualReport(company: string, year: string): Promise<ReportSearchResult> {
+export async function searchAnnualReport(
+  company: string,
+  year: string
+): Promise<ReportSearchResult | ReportAlreadyIngested> {
   const companyKey = company.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // 0. If already ingested in Context Studio, skip the expensive PDF download.
+  if (CS_INGESTED_KEYS.has(companyKey)) {
+    return {
+      ingested: true,
+      company,
+      year,
+      contextStudioQuery: `${company} ${year} annual report financial results`
+    };
+  }
 
   // 1. Try known direct URL first — parse the actual PDF
   const knownUrl = KNOWN_REPORT_URLS[companyKey]?.[year];

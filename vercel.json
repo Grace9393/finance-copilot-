@@ -9,7 +9,7 @@
     {
       "src": "api-dist/*.mjs",
       "use": "@vercel/node",
-      "config": { "maxDuration": 60, "includeFiles": "api-dist/pdf.worker.mjs" }
+      "config": { "maxDuration": 300, "includeFiles": "api-dist/pdf.worker.mjs" }
     }
   ],
   "routes": [
