@@ -21,25 +21,26 @@ export interface DataContext {
   narrative?: string;
 }
 
-/** Prepend a concise data summary to the user message so the Context Studio
- *  query is grounded with the currently loaded dashboard data. */
-function buildGroundedMessage(message: string, dataContext?: DataContext): string {
-  if (!dataContext || !dataContext.rows?.length) return message;
+/**
+ * Ground a Context Studio query with the loaded data - *lightly*.
+ *
+ * Context Studio queries are semantic: the message becomes an embedding. Dumping
+ * 20 raw rows in made queries take 75-130s (gateway timeouts -> error bubbles)
+ * and polluted retrieval with unrelated values. We now send a compact schema
+ * summary only, and when the user explicitly typed @context we send the bare
+ * question - they asked the knowledge base, not their spreadsheet.
+ */
+function buildGroundedMessage(message: string, dataContext?: DataContext, explicitContextQuery = false): string {
+  if (!dataContext || !dataContext.rows?.length || explicitContextQuery) return message;
 
-  const rowSample = dataContext.rows.slice(0, 20);
-  const summary = [
-    `[DASHBOARD DATA — source: ${dataContext.source}]`,
-    `Fields: ${dataContext.fields.join(', ')}`,
-    `Rows (first ${rowSample.length} of ${dataContext.rows.length}):`,
-    JSON.stringify(rowSample),
-    dataContext.kpis ? `KPIs: ${JSON.stringify(dataContext.kpis)}` : '',
-    dataContext.narrative ? `Narrative: ${dataContext.narrative}` : '',
-    '[END DASHBOARD DATA]',
-    '',
+  const sample = dataContext.rows[0]
+    ? Object.entries(dataContext.rows[0]).slice(0, 6).map(([k, v]) => `${k}=${String(v).slice(0, 24)}`).join(', ')
+    : '';
+  return [
+    `[Loaded data: ${dataContext.source} - ${dataContext.rows.length} rows; fields: ${dataContext.fields.slice(0, 15).join(', ')}]`,
+    sample ? `[Example row: ${sample}]` : '',
     message
   ].filter(Boolean).join('\n');
-
-  return summary;
 }
 
 function buildToolCall(mode: ChatMode, message: string): { tool: string; args: Record<string, unknown> } {
@@ -475,7 +476,7 @@ chatRouter.post('/', async (request, response) => {
   const csMessage = isContextPrefixed
     ? trimmedMessage.replace(/^@context\s*/i, '').trim()
     : (skillInvocation?.message ?? trimmedMessage);
-  const groundedMessage = buildGroundedMessage(csMessage, dataContext);
+  const groundedMessage = buildGroundedMessage(csMessage, dataContext, isContextPrefixed);
   // "list documents / what files are in the context" → metadata endpoint;
   // hybrid retrieval searches content and cannot enumerate the library.
   const wantsDocumentList = /\b(list|show|what|which)\b[^.?!]*\b(documents?|files?|sources?)\b|\bdocuments? (list|inventory)\b/i.test(csMessage);
