@@ -5191,7 +5191,8 @@ async function rpc(method, params, isNotification = false) {
   const response = await fetch(config.url, {
     method: "POST",
     headers,
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(Number(process.env.CONTEXT_STUDIO_TIMEOUT_MS ?? 55e3))
   });
   const newSessionId = response.headers.get("mcp-session-id");
   if (newSessionId) {
@@ -5245,6 +5246,11 @@ async function listTools() {
   const response = await withSessionRetry(() => rpc("tools/list", {}));
   const result = response?.result;
   return result?.tools ?? [];
+}
+function isTimeoutError(error) {
+  const name = error?.name;
+  const message = error instanceof Error ? error.message : String(error);
+  return name === "TimeoutError" || name === "AbortError" || /timed? ?out|aborted/i.test(message);
 }
 async function callTool(name, args) {
   const response = await withSessionRetry(() => rpc("tools/call", { name, arguments: args }));
@@ -40006,6 +40012,19 @@ async function handler(req, res) {
       const result = await callTool(tool2, args2);
       res.json({ reply: extractText(result), dashboard: dashboardDirective, tool: tool2, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? void 0 });
     } catch (error) {
+      if (isTimeoutError(error)) {
+        res.json({
+          reply: `\u23F1\uFE0F Context Studio did not answer in time using **${tool2.replace("context-broker-", "")}**.
+
+` + (chatMode === "graph" ? "Graph traversal is slow on large contexts \u2014 try **Hybrid** or **Vector** mode for the same question." : "The knowledge base may be busy. Try again, or switch query mode."),
+          dashboard: dashboardDirective,
+          tool: tool2,
+          mode: chatMode,
+          isError: true,
+          elapsedMs: Date.now() - startedAt
+        });
+        return;
+      }
       res.status(502).json({ error: error instanceof Error ? error.message : "Context Studio request failed", tool: tool2, mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
     return;

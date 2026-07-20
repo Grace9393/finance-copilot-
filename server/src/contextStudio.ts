@@ -111,10 +111,14 @@ async function rpc(method: string, params: Record<string, unknown>, isNotificati
     body.id = ++rpcId;
   }
 
+  // Fail fast instead of hanging: some broker calls (notably graph traversal on
+  // large contexts) run for 3+ minutes and then error anyway. A bounded wait
+  // lets the caller return a useful message while the user is still watching.
   const response = await fetch(config.url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(Number(process.env.CONTEXT_STUDIO_TIMEOUT_MS ?? 55000))
   });
 
   const newSessionId = response.headers.get('mcp-session-id');
@@ -184,6 +188,13 @@ export async function listTools(): Promise<McpToolInfo[]> {
   const response = await withSessionRetry(() => rpc('tools/list', {}));
   const result = response?.result as { tools?: McpToolInfo[] } | undefined;
   return result?.tools ?? [];
+}
+
+/** True when the failure was our bounded-wait timeout rather than a broker error. */
+export function isTimeoutError(error: unknown): boolean {
+  const name = (error as { name?: string })?.name;
+  const message = error instanceof Error ? error.message : String(error);
+  return name === 'TimeoutError' || name === 'AbortError' || /timed? ?out|aborted/i.test(message);
 }
 
 export async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {

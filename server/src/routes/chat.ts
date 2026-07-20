@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { callTool, extractText, getConfig, listTools } from '../contextStudio.js';
+import { callTool, extractText, getConfig, isTimeoutError, listTools } from '../contextStudio.js';
 import { answerFromDataContext } from '../dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../enquiry.js';
 import { detectDirective } from '../dashboardDirective.js';
@@ -496,6 +496,20 @@ chatRouter.post('/', async (request, response) => {
       skill: skillInvocation?.skill
     });
   } catch (error) {
+    if (isTimeoutError(error)) {
+      response.json({
+        reply: `⏱️ Context Studio did not answer in time using **${tool.replace('context-broker-', '')}**.\n\n` +
+          (chatMode === 'graph'
+            ? 'Graph traversal is slow on large contexts — try **Hybrid** or **Vector** mode for the same question.'
+            : 'The knowledge base may be busy. Try again, or switch query mode.'),
+        dashboard: dashboardDirective,
+        tool,
+        mode: chatMode,
+        isError: true,
+        elapsedMs: Date.now() - startedAt
+      });
+      return;
+    }
     response.status(502).json({
       error: error instanceof Error ? error.message : 'Context Studio request failed',
       tool,
@@ -504,3 +518,4 @@ chatRouter.post('/', async (request, response) => {
     });
   }
 });
+

@@ -1,6 +1,6 @@
 // v2 — skill-aware routing: skills/@context/data/vector/graph → Context Studio; web-search is last-resort fallback
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { callTool, extractText, getConfig, listTools } from '../server/src/contextStudio.js';
+import { callTool, extractText, getConfig, isTimeoutError, listTools } from '../server/src/contextStudio.js';
 import { detectDirective } from '../server/src/dashboardDirective.js';
 import { answerFromDataContext } from '../server/src/dataAnswer.js';
 import { answerEnquiry, detectEnquiry } from '../server/src/enquiry.js';
@@ -197,6 +197,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result = await callTool(tool, args);
       res.json({ reply: extractText(result), dashboard: dashboardDirective, tool, mode: chatMode, isError: result.isError ?? false, elapsedMs: Date.now() - startedAt, skill: detectedSkill ?? undefined });
     } catch (error) {
+      if (isTimeoutError(error)) {
+        res.json({
+          reply: `⏱️ Context Studio did not answer in time using **${tool.replace('context-broker-', '')}**.\n\n` +
+            (chatMode === 'graph'
+              ? 'Graph traversal is slow on large contexts — try **Hybrid** or **Vector** mode for the same question.'
+              : 'The knowledge base may be busy. Try again, or switch query mode.'),
+          dashboard: dashboardDirective, tool, mode: chatMode, isError: true, elapsedMs: Date.now() - startedAt
+        });
+        return;
+      }
       res.status(502).json({ error: error instanceof Error ? error.message : 'Context Studio request failed', tool, mode: chatMode, elapsedMs: Date.now() - startedAt });
     }
     return;
