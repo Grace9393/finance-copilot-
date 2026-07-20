@@ -5237,6 +5237,7 @@ async function withSessionRetry(operation) {
   try {
     return await operation();
   } catch (error) {
+    if (isTimeoutError(error)) throw error;
     resetSession();
     await ensureSession();
     return operation();

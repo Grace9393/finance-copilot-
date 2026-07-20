@@ -177,6 +177,9 @@ async function withSessionRetry<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
   } catch (error) {
+    // A timeout is the broker being slow, not a stale session — retrying would
+    // just double the wait the user sits through.
+    if (isTimeoutError(error)) throw error;
     // Session may have expired on the gateway side — start over once.
     resetSession();
     await ensureSession();
