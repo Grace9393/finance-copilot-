@@ -704,8 +704,7 @@ export function ChatPanel({ dataContext, onDataContextChange, welcomeText, sugge
       {/* Header */}
       <div className="chat-header">
         <div>
-          <div className="chat-title">Context Studio Chat</div>
-          <div className="chat-subtitle muted">Context Studio</div>
+          <div className="chat-title">ICA & Skill Chat</div>
           {activeBadge ? (
             <div className="chat-datasource-badge">{activeBadge}</div>
           ) : (
